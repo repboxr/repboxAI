@@ -1,0 +1,11 @@
+Package: repboxAI
+Type: Package
+Title: AI production chain for repbox
+Version: 0.1.0
+Author: Sebastian Kranz
+Maintainer: Sebastian Kranz <sebastian.kranz@uni-ulm.de>
+Description: AI production chain for repbox
+License: GPL>= 20.
+Encoding: UTF-8
+Depends: FuzzyProduction, repboxUtils, repboxDB
+LazyData: true

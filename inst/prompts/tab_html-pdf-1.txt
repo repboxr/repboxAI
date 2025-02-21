@@ -1,0 +1,14 @@
+Attached is a PDF of a scientific article. Please find Table {{tabid}} with the title "{{tabtitle}}" and convert the table to an HTML table. Only return the HTML fragment of the table of the form
+
+<table>
+... all extracted cells ...
+</table>
+
+Don't add any further remarks. The extracted HTML table shall neither include the table notes nor the table title.
+
+Important: Make sure to convert the content as close as possible to the PDF version of the table.
+
+Important: Make sure that you parse the HTML table such that separate numbers are in different table <td> cells. If the PDF shows values in different rows, you typically should but them into different <tr> table rows.
+
+Important: Check whether you have really extracted the correct cell contents.
+

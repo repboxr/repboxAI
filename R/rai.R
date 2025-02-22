@@ -1,12 +1,3 @@
-get_ai_opts = function() {
-  ai_opts = list(model = "gemini-2.0-flash", temperature=0, short_model = "2.0f")
-}
-
-ai_model_short = function(model) {
-  case_when(
-    model == "gemini-2.0-flash" ~ "g2f"
-  )
-}
 
 
 # version characterizes the general parameters of the repbox AI call not specific
@@ -36,7 +27,7 @@ rai_version = function(pid, ai_opts,tpl_file=NA,json_mode=TRUE, use_schema=FALSE
 
 
 # rai stands for repbox AI call. It contains a version object and additional information specific to the AI call
-rai_init = function(project_dir, version, schema=NULL, values = NULL, media_files=NULL, tpl=NULL, tpl_file = version$tpl_file, model=version$model, temperature=version$temperature, json_mode=version$json_mode) {
+rai_init = function(project_dir, version, schema=NULL, values = NULL, context=NULL, media_files=NULL, tpl=NULL, tpl_file = version$tpl_file, model=version$model, temperature=version$temperature, json_mode=version$json_mode) {
   restore.point("rai_init")
   #undebug(to_json_schema)
   schema = to_json_schema(schema)
@@ -46,10 +37,10 @@ rai_init = function(project_dir, version, schema=NULL, values = NULL, media_file
     stop("provide a template tpl or tpl_file or haver version$tpl_file filled.")
   }
 
-  rai = list(project_dir = project_dir, tpl=tpl, model=model, schema=schema, json_mode=version$json_mode, temperature=temperature, media_files=media_files, version=version)
+  rai = list(project_dir = project_dir, tpl=tpl, model=model, schema=schema, json_mode=version$json_mode, temperature=temperature, media_files=media_files, version=version, context=context)
 }
 
-rai_run = function(rai, values=rai$values) {
+rai_run = function(rai, values=rai$values, verbose=FALSE) {
   restore.point("rai_run")
   if (is.null(rai[["prompt"]]))
     rai = rai_glue(rai, values)
@@ -59,20 +50,19 @@ rai_run = function(rai, values=rai$values) {
   }
 
   library(rgemini)
-  rai$media = repbox_ai_media(rai$project_dir, rai$media_files)
+  rai$media = repbox_ai_media(rai$project_dir, rai$media_files, verbose=verbose)
 
   rai$time_stamp = Sys.time()
-  rai$httr_res = try(run_gemini(rai$prompt, model=rai$model,response_schema = rai[["schema"]], json_mode=rai$json_mode,temperature = rai$temperature, media = rai$media,just_content = FALSE, httr_response = TRUE), silent=TRUE)
+  res = run_gemini(rai$prompt, model=rai$model,context=rai$context, response_schema = rai[["schema"]], json_mode=rai$json_mode,temperature = rai$temperature, media = rai$media,detailed_results=TRUE,verbose=FALSE)
+  rai[names(res)] = res
+
   restore.point("rai_run_post")
 
   rai$run_sec = as.numeric(Sys.time()) - as.numeric(rai$time_stamp)
 
-  rai$df_res = try(gemini_result_to_df(rai$httr_res), silent=TRUE)
-  rai$content = try(gemini_content(rai$df_res), silent=TRUE)
-
-  rai$has_error = is(rai$content, "try-error")
-  if (rai$has_error) {
-    cat("\n  Error running gemini request...")
+  if (isTRUE(rai$has_error)) {
+    if (verbose)
+      cat("\n",rai$err_msg,"\n")
   }
   class(rai) = c("repbox_rai","list")
 

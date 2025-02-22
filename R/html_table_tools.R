@@ -23,7 +23,7 @@ example = function() {
 }
 
 
-html_table_add_cellnum_row_col <- function(html) {
+html_table_add_cellnum_row_col <- function(html, id_prefix = "cell-") {
   library(xml2)
   # Parse the HTML string into an XML document
   doc <- read_html(html)
@@ -68,7 +68,7 @@ html_table_add_cellnum_row_col <- function(html) {
       xml_attr(cell, "class") <- NULL
 
       # Add new attributes:
-      xml_set_attr(cell, "id", paste0("cell-", cell_num))
+      xml_set_attr(cell, "id", paste0(id_prefix, cell_num))
       xml_set_attr(cell, "class", paste0("row-", r, " col-", cell_col))
       cell_num <- cell_num + 1
 

@@ -31,6 +31,30 @@ repbox_prods = function() {
       list(
         tabhtml = schema_html_tab()
       )
+    ),
+    prod_define(
+      "cell_list",
+      # means 1 parent row can have multiple children rows
+      parent = "tab_html",
+      from_parent = c("tabid", "otabid"),
+      fields = list(
+        schema_str("cellid", is_key=TRUE),
+        schema_int("row"),
+        schema_int("col"),
+        schema_str("celltxt")
+      )
+    ),
+    prod_define(
+      "cell_base",
+      widens = "cell_list",
+      fields = list(
+        schema_bool("is_num"),
+        schema_bool("has_deci"),
+        schema_str("braces", enum=c("", "(","[","{")),
+        schema_bool("has_sig_star"),
+        schema_str("sig_star","*")
+      ),
+      descr ="Can be generated purely using heuristics from td_list"
     )
   )
   prods

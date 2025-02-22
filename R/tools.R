@@ -1,6 +1,16 @@
 # Will probably be moved to repboxUtils
 # but keep them here during development cycle
 
+first.non.null = function (...) 
+{
+  args = list(...)
+  for (val in args) {
+    if (!is.null(val)) 
+      return(val)
+  }
+  return(NULL)
+}
+
 invert_names_values = function(x) {
   y = names(x)
   names(y) = x

@@ -1,10 +1,10 @@
 # rais is a collection of similar rai
 # that are called for different rows of an input data set
-rais_init = function(li, prod=NULL, to_r0=TRUE, df=NULL) {
+rais_init = function(li, prod=NULL, to_r0=TRUE, df=NULL, input_info=NULL) {
   restore.point("rais_init")
   if (is(li,"repbox_rai")) li = list(li)
   rai = li[[1]]
-  rais = list(rai=rai, li=li, nrow = max(length(li), NROW(df)), to_r0=to_r0, prod=prod, issues=list())
+  rais = list(rai=rai, li=li, nrow = max(length(li), NROW(df)), to_r0=to_r0, prod=prod, issues=list(), input_info=input_info)
   fields = c("project_dir","version","pid","json_mode")
   rais[fields] = rai[fields]
   if (is.null(df)) {
@@ -14,22 +14,11 @@ rais_init = function(li, prod=NULL, to_r0=TRUE, df=NULL) {
   }
   version = rais$version
   
+  
   project_dir = rais$project_dir
-  version_dir = file.path(project_dir, "rai", "prod_runs", version$pid, version$vid)
-  if (to_r0) {
-    run_dir = file.path(version_dir, "r0")
-  } else {
-    run_dirs = list.dirs(version_dir, full.names=FALSE, recursive=TRUE)
-    if (length(run_dirs)==0) {
-      run_dir = file.path(version_dir, "r1")
-    } else {
-      run_nums = as.integer(substr(run_dirs, 2))
-      max_run = max(run_nums)
-      run_dir = file.path(version_dir, paste0("r", max_run+1))
-    }
-  }
-  rais$version_dir = version_dir
-  rais$run_dir = run_dir
+  dirs = hx_make_version_run_dir(rais)
+  rais[names(dirs)] = dirs
+  
   class(rais) = c("repbox_rais","list")
   rais
   
@@ -114,6 +103,10 @@ rais_save = function(rais, prod_df=rais[["prod_df"]], save_rais = TRUE) {
   err_file = file.path(run_dir, "has_err.txt")
   if (file.exists(err_file)) file.remove(err_file)
   
+  if (!is.null(rais$input_info)) {
+    saveRDS(rais$input_info,  file.path(run_dir, "input_info.Rds") )
+  }
+  
   saveRDS(rai_stats, file.path(run_dir, "rai_stats.Rds"))
   saveRDS(version, file.path(run_dir, "version.Rds"))
   saveRDS(prod_df, file.path(run_dir, "prod_df.Rds"))
@@ -146,9 +139,15 @@ rais_save_error = function(rais, err_msg="unspecified error") {
   if (!dir.exists(rais$run_dir)) dir.create(rais$run_dir)
   
   rais$has_error = TRUE
-  saveRDS(rais,"rais.Rds")
+  saveRDS(rais,file.path(rais$run_dir,"rais.Rds"))
   if (is.null(err_msg)) err_msg="unspecified error"
   writeLines(err_msg, file.path(rais$run_dir,"has_error.txt"))
+  
+  if (!is.null(rais$input_info)) {
+    saveRDS(rais$input_info,  file.path(rais$run_dir, "input_info.Rds") )
+  }
+  
+  
   invisible(rais)
 }
 

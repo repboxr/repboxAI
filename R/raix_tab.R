@@ -24,14 +24,13 @@ raix_tab_html_pdf = function(project_dir, tpl_num=1,prods=repbox_prods(), ai_opt
   tpl_file = file.path(repbox_ai_tpl_dir(), paste0(pid, "-", art_source, "-", tpl_num, ".txt"))
   version = rai_version(pid, ai_opts=ai_opts,tpl_file=tpl_file,json_mode = FALSE, use_schema=FALSE, art_source="pdf", tpl_num=tpl_num)
 
+  inputs = rai_pick_input_prod(project_dir, c("tab_tino"))
+  if (input_prod_err(inputs)) return(NULL)
 
-  df = rai_load_prod_df(project_dir=project_dir, pid = "tab_tino")
-  if (is.null(df)) {
-    stop("No version of the intermediate product tab_tino available.")
-  }
   context = repbox_ai_context(project_dir, add_art_pdf = TRUE)
   rai = rai_init(project_dir, version=version, context=context)
 
+  df = rai_load_input_prods(inputs)[[1]]
   # For faster testing
   # df = df[1,]
 
@@ -43,7 +42,7 @@ raix_tab_html_pdf = function(project_dir, tpl_num=1,prods=repbox_prods(), ai_opt
     rai = rai_run(rai, values=values)
   })
   restore.point("post_run")
-  rais = rais_init(rai_li,df = df)
+  rais = rais_init(rai_li,df = df, input_info=inputs)
   rais = rais_combine_content(rais, var="raw_html")
   df = rais$df
   df$tabhtml = sapply(df$raw_html,html_table_add_cellnum_row_col)

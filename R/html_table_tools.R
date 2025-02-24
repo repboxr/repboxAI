@@ -45,6 +45,14 @@ html_table_add_cellnum_row_col <- function(html, id_prefix = "cell-") {
       occupied[[r]] <- integer(0)
     }
 
+    tr = rows[[r]]
+    # Remove any data-* attributes
+    data_attrs <- names(xml_attrs(tr))[grep("^data-", names(xml_attrs(tr)))]
+    for (attr in data_attrs) {
+      xml_attr(tr, attr) <- NULL
+    }
+    
+    
     col <- 1  # starting column index for this row
     # Get all cells (<td> or <th>) in the row
     cells <- xml_find_all(rows[[r]], "./th|./td")
@@ -66,7 +74,14 @@ html_table_add_cellnum_row_col <- function(html, id_prefix = "cell-") {
       # Remove any existing id or class attributes
       xml_attr(cell, "id") <- NULL
       xml_attr(cell, "class") <- NULL
-
+      xml_attr(cell, "style") <- NULL
+      
+      # Remove any data-* attributes
+      data_attrs <- names(xml_attrs(cell))[grep("^data-", names(xml_attrs(cell)))]
+      for (attr in data_attrs) {
+        xml_attr(cell, attr) <- NULL
+      }
+      
       # Add new attributes:
       xml_set_attr(cell, "id", paste0(id_prefix, cell_num))
       xml_set_attr(cell, "class", paste0("row-", r, " col-", cell_col))
@@ -97,4 +112,49 @@ html_table_add_cellnum_row_col <- function(html, id_prefix = "cell-") {
 
   # Return the modified table as an HTML string
   as.character(table_node)
+}
+
+library(rvest)
+library(dplyr)
+
+normalized_html_tab_to_cell_df <- function(html) {
+  # Parse HTML
+  doc <- read_html(html)
+  
+  # Extract all td elements
+  cells <- html_elements(doc, "td")
+  
+  # Extract attributes and text content vectorized
+  cell_ids <- html_attr(cells, "id")
+  cell_classes <- html_attr(cells, "class")
+  cell_content <- html_text(cells, trim = TRUE)
+  cell_colspan <- as.integer(html_attr(cells, "colspan"))
+  cell_colspan[is.na(cell_colspan)] <- 1  # Default colspan is 1
+
+  cell_rowspan <- as.integer(html_attr(cells, "rowspan"))
+  cell_rowspan[is.na(cell_rowspan)] <- 1  # Default rowspan is 1
+  
+  # Extract row and column numbers from classes
+  # Using vectorized string operations
+  row_nums <- as.integer(sub(".*row-(\\d+).*", "\\1", cell_classes))
+  col_nums <- as.integer(sub(".*col-(\\d+).*", "\\1", cell_classes))
+  
+  # Create the dataframe
+  df <- data.frame(
+    cellid = cell_ids,
+    row = row_nums,
+    col = col_nums,
+    colspan = cell_colspan,
+    rowspan = cell_rowspan,
+    content = cell_content,
+    stringsAsFactors = FALSE
+  )
+  
+  # Sort by row and column
+  #df <- df[order(df$row, df$col), ]
+  
+  # Reset row names
+  rownames(df) <- NULL
+  
+  return(df)
 }

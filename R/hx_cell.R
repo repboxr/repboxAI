@@ -16,19 +16,21 @@ hx_all_tab_html_to_cell_list = function(project_dir) {
 }
 
 # cell_list is a derived prod of tab_html
-hx_tab_html_to_cell_list = function(hx, run_dir=hx$run_dir, prods=repbox_prods(), prod_df=hx$prod_df, version=hx$version) {
+hx_tab_html_to_cell_list = function(hx=NULL, run_dir=hx$run_dir, prods=repbox_prods(), prod_df=hx$prod_df, version=hx$version) {
   restore.point("hx_tab_html_to_cell_list")
   prod = prods[["cell_list"]]
-  
-  hx = ddp_init_hx(hx, run_dir=run_dir,ddp_pid="cell_list", version = version)
   if (is.null(prod_df)) {
-    df = readRDS(file.path(hx$run_dir, "prod_df.Rds"))
+    df = readRDS(file.path(run_dir, "prod_df.Rds"))
   } else{
     df = prod_df
   }
+  
+  hx = ddp_init_hx(hx, run_dir=run_dir,ddp_pid="cell_list", version = version)
   i = 1
   cell_df = bind_rows(lapply(seq_len(NROW(df)), function(i) {
-    cell_df = add_col_left(normalized_html_tab_to_cell_df(df$tabhtml[[i]]), tabid=df$tabid[i],otabid = df$otabid[i])
+    restore.point("shkfjhksfdo")
+    cell_df = normalized_html_tab_to_cell_df(df$tabhtml[[i]])
+    cell_df = add_col_left(cell_df, tabid=df$tabid[i],otabid = df$otabid[i])
     cell_df$cellid = paste0(df$tabid[i],"_", stri_sub(cell_df$cellid,6))
     cell_df      
   }))

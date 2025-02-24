@@ -1,7 +1,7 @@
 
 hx_init = function(project_dir, version, prod=NULL, to_r0=TRUE, input_info=NULL, run_dir=NULL) {
   hx = list(project_dir=project_dir, version=version, prod=prod, to_r0=to_r0, input_info=input_info)
-  dirs = rais_make_version_run_dir(hx)
+  dirs = hx_make_version_run_dir(hx)
   hx[names(dirs)] = dirs
   if (!is.null(run_dir)) {
     hx$run_dir = run_dir
@@ -34,7 +34,7 @@ hx_backport_save = function(hx,bp_prod, prod_df=hx$prod_df) {
   if (is.null(bp_prod)) stop("Need bp_prod.")
   bp_prod_df = df_to_prod_df(prod_df, bp_prod)
   hx$version$pid = bp_prod$pid
-  dirs = rais_make_version_run_dir(hx)
+  dirs = hx_make_version_run_dir(hx)
   hx[names(dirs)] = dirs
   bp = hx_save(hx,bp_prod_df)
   invisible(bp)

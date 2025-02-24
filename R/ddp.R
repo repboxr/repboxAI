@@ -50,3 +50,22 @@ ddp_init_hx = function(hx=NULL, ddp_pid, prods = repbox_prods(), version=hx$vers
   ddp_hx = hx_init(project_dir, version, prod,input_info=input_info, run_dir=ddp_run_dir)
   ddp_hx
 }
+
+#' Derives all ddp instances
+#' 
+#' Will be typically called from a wrapper function like \code{hx_all_tab_html_to_cell_list}
+#' 
+ddp_derive_all_instances = function(project_dir,from_pid, to_pid, convert_fun,  overwrite=FALSE) {
+  restore.point("ddp_derive_all_instances")
+  from_parent_dir = file.path(project_dir, "rai/prod_runs", from_pid)
+  from_files = list.files(from_parent_dir, glob2rx("prod_df.Rds"),full.names = TRUE, recursive=TRUE) 
+  file = from_files[1]
+  for (file in from_files) {
+    run_dir = dirname(file)
+    if (!overwrite) {
+      if (ddp_is_up_to_date(run_dir, to_pid)) next
+    }
+    convert_fun(run_dir = run_dir)
+  }
+}
+

@@ -1,3 +1,8 @@
+hx_load_prod_df = function(hx=NULL, run_dir = hx$run_dir, prod_df=NULL) {
+  if (!is.null(prod_df)) return(prod_df)
+  readRDS(file.path(run_dir, "prod_df.Rds"))
+}
+
 
 hx_init = function(project_dir, version, prod=NULL, to_r0=TRUE, input_info=NULL, run_dir=NULL) {
   hx = list(project_dir=project_dir, version=version, prod=prod, to_r0=to_r0, input_info=input_info)

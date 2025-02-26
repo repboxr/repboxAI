@@ -24,6 +24,20 @@ rais_init = function(li, prod=NULL, to_r0=TRUE, df=NULL, input_info=NULL) {
   
 }
 
+rais_backup_if_incomplete = function(rais, ic_status_codes = c(429, 500, 503, 504)) {
+  restore.point("rais_backup_if_incomplete")
+  
+  status_codes = sapply(rais$li, function(rai) rai$status_code)
+  problem_codes = status_codes[status_codes %in% ic_status_codes]
+  if (length(problem_codes)>0) {
+    saveRDS(rais, file.path(rais$run_dir, "incomplete_rais.Rds"))
+    
+    cat(paste0("\n ", length(problem_codes), " of ", length(status_codes), " AI had non-availability of service problems (status code: ", paste(unique(status_codes), collapse=", "), "). Incomplete rais object saved to ", rais$run_dir))
+    return(TRUE)
+  }
+  return(FALSE)
+}
+
 rais_add_issue = function(rais, type,details="") {
   issue = tibble(type=type, details=details) 
   rais$issues = c(rais$issues, list(issue))
@@ -93,7 +107,7 @@ rais_save = function(rais, prod_df=rais[["prod_df"]], save_rais = TRUE) {
   if (!dir.exists(rais$run_dir)) dir.create(rais$run_dir)
   
   if (save_rais) {
-    saveRDS(rais,"rais.Rds")
+    saveRDS(rais,file.path(rais$run_dir,"rais.Rds"))
   }
   rai_stats=rais_rai_stats(rais)
   if (length(rais["issues"]>0)) {

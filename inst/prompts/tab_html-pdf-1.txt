@@ -4,11 +4,15 @@ Attached is a PDF of a scientific article. Please find Table {{tabid}} with the 
 ... all extracted cells ...
 </table>
 
-Don't add any further remarks. The extracted HTML table shall neither include the table notes nor the table title.
+Don't add any further remarks. Don't bother with css styling of the table. The extracted HTML table shall neither include the table notes nor the table title.
 
-Important: Make sure to convert the content as close as possible to the PDF version of the table.
+Important: Ensure that you copy the cell content, in particular, all numbers, correctly.
 
-Important: Make sure that you parse the HTML table such that separate numbers are in different table <td> cells. If the PDF shows values in different rows, you typically should but them into different <tr> table rows.
+Important: Try to have a column layout close to the the PDF version of the table. For example, if a column titlespans more than one column: add a corresponding colspan attribute to the td element. Separate numbers should always be in separate <td> cells. 
 
-Important: Check whether you have really extracted the correct cell contents.
+Important: Separate numbers into different <td> cells. For example, we never want have a <td> cell with a content like "5.23 (3.2)" that contains both a coefficient and the standard errors. 
+
+VERY IMPORTANT: Make a separate <tr> row for each different line of text or numbers in the original table. Even if you think that multiple lines logically belong to the same cell, split them into different <tr> rows and corresponding different <td> elements if they are show in different lines in the original PDF.
+
+
 

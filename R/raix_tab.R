@@ -5,13 +5,14 @@ example = function() {
   rgemini::set_gemini_api_key(file = "~/repbox/gemini/gemini_api_key.txt")
   set_ai_opts(model = "gemini-1.5-flash-001")
   set_ai_opts(model = "gemini-2.0-flash")
-  set_ai_opts(model = "gemini-2.0-flash-lite-preview-02-05")
+  set_ai_opts(model = "gemini-2.0-flash-lite")
+  set_ai_opts(model = "gemini-2.0-flash-thinking-exp")
   get_ai_opts()
   project_dir = "~/repbox/projects_share/aejapp_1_2_4"
+  res = raix_tab_html_pdf(project_dir, prods=prods)
   prods = repbox_prods()
   res = raix_tab_tino_pdf(project_dir, prods=prods)
   rstudioapi::filesPaneNavigate(res$run_dir)
-  res = raix_tab_html_pdf(project_dir, prods=prods)
 }
 
 #' Extracts tab_tino from articles
@@ -43,11 +44,15 @@ raix_tab_html_pdf = function(project_dir, tpl_num=1,prods=repbox_prods(), ai_opt
   })
   restore.point("post_run")
   rais = rais_init(rai_li,df = df, input_info=inputs)
+  if (rais_backup_if_incomplete(rais)) return(NULL)
+  
   rais = rais_combine_content(rais, var="raw_html")
   df = rais$df
   df$tabhtml = sapply(df$raw_html,html_table_add_cellnum_row_col)
   prod_df = df_to_prod_df(df, prod)
   rais_save(rais, prod_df)
+  hx_write_all_tables_html(prod_df, "tables.html", run_dir=rais$run_dir)
+  
   #rstudioapi::filesPaneNavigate(rais$run_dir)
 
   return(invisible(rais))

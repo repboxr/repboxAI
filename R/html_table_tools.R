@@ -25,6 +25,9 @@ example = function() {
 
 html_table_add_cellnum_row_col <- function(html, id_prefix = "cell-") {
   library(xml2)
+  restore.point("html_table_add_cellnum_row_col")
+  if (is.null(html)) return(NULL)
+  
   # Parse the HTML string into an XML document
   doc <- read_html(html)
 
@@ -158,3 +161,30 @@ normalized_html_tab_to_cell_df <- function(html) {
   
   return(df)
 }
+
+hx_write_all_tables_html = function( tab_df,html_file=NULL, html_col = "tabhtml", run_dir=NULL,add_version=TRUE, version=NULL, title=NULL) {
+  restore.point("hx_write_all_tables_html")
+  style = "<style> 
+  table { border-spacing: 0px; border-collapse: collapse;}
+  table td {padding-left: 4px; padding-right: 4px; padding-top: 2px; padding-bottom: 2px; border: 1px solid lightgray;} </style>"
+  head = style
+  if (!is.null(title)) head = paste0(head,"<h1>", title, "</h1>")
+  if (!is.null(run_dir)) head = paste0(head,"<p><pre>", run_dir, "</pre></p>")
+  tab_html = paste0(paste0("<h2>Table ", tab_df$tabid,"</h2>", tab_df$tabhtml,"<br>", collapse = "\n"))
+  foot = ""
+  if (add_version & is.null(version) & !is.null(run_dir)) {
+    version = readRDS(file.path(run_dir, "version.Rds"))
+  }
+  if (add_version & !is.null(version)) {
+    version = as.list(version)
+    foot = paste0(foot, "<ul>", paste0("<li>",names(version), ": ", version, " </li>", collapse="\n"),"</ul>")
+  }
+  html = paste0(head, "\n", tab_html, foot)
+  if (is.null(html_file)) return(invisible(html))
+  if (basename(html_file)==html_file & !is.null(run_dir)) html_file = file.path(run_dir, html_file)
+  writeUtf8(html, html_file)
+  #writeLines(html, html_file)
+  invisible(html)
+  
+}
+

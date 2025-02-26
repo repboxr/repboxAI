@@ -1,6 +1,10 @@
 # Will probably be moved to repboxUtils
 # but keep them here during development cycle
 
+has_col = function(x, col) {
+  col %in% names(x)
+}
+
 first.non.null = function (...) 
 {
   args = list(...)

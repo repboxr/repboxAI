@@ -70,7 +70,13 @@ repbox_prods = function() {
         sig_star_str = schema_str(),
         other_num_str = schema_str(descr = "Not empty if we found another number string looking from the right"),
         nchar = schema_int(),
-        nchar_letters = schema_int()
+        nchar_letters = schema_int(),
+        
+        # Tests that can be quickly computed and will be added       
+        flag_two_num = schema_bool(descr="Are there two numbers in the cell? Can suggests incorrect cell splits."),
+        flag_two_deci = schema_bool(descr="Are there two decimal numbers in the cell? More strongly suggests wrong cell split."),
+        flag_miss_bracket_below = schema_bool(descr="Do we miss a cell like (3.42) below, because such cells are below other numbers in the row?"),
+        flag_miss_num_above_bracket = schema_bool(descr="Complements flag_miss_bracket_below, do we miss a cell with a normal number like 1.32 above a cell like (3.42)?")
       ),
       descr ="Will be generated with heuristics from cell_list. We have so many fields because they may facilitate consistency checks of the extracted tables."
     )

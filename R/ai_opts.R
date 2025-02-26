@@ -14,6 +14,9 @@ ai_model_short = function(model) {
   case_when(
     model == "gemini-2.0-flash" ~ "g2f",
     model == "gemini-1.5-flash-001" ~ "g15f",
-    model == "gemini-2.0-flash-lite-preview-02-05" ~ "g2flp"
+    model == "gemini-2.0-flash-lite-preview-02-05" ~ "g2flp",
+    model == "gemini-2.0-flash-lite" ~ "g2fl",
+    model == "gemini-2.0-flash-thinking-exp" ~ "g2fte",
+    TRUE ~ model    
   )
 }

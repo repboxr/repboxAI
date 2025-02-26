@@ -8,4 +8,6 @@ source_dir = function(dir, verbose=TRUE) {
     source(f)
   }
 }
+cat("\nSource FuzzyProduction and repboxTableTools")
 source_dir("~/repbox/gemini/FuzzyProduction/R")
+source_dir("~/repbox/gemini/repboxTableTools/R")

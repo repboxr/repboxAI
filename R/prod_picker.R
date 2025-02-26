@@ -42,10 +42,3 @@ rai_load_input_prods = function(inputs, pid) {
   names(prod_li) = inputs$pid
   prod_li
 }
-
-rai_load_prod_df = function(run_dir = rai_prod_pick_run_dir(project_dir, pid), project_dir=NULL, pid=NULL) {
-  if (is.null(run_dir)) return(NULL)
-  restore.point("rai_load_prod_df")
-  file = file.path(run_dir, "prod_df.Rds")
-  readRDS(file)
-}

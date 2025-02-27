@@ -1,10 +1,17 @@
 # rais is a collection of similar rai
 # that are called for different rows of an input data set
-rais_init = function(li, prod=NULL, to_r0=TRUE, df=NULL, input_info=NULL) {
+rais_init = function(li=NULL, prod=NULL, to_r0=TRUE, df=NULL, input_info=NULL, rai=NULL, version=NULL, finish_function=NULL) {
   restore.point("rais_init")
   if (is(li,"repbox_rai")) li = list(li)
-  rai = li[[1]]
-  rais = list(rai=rai, li=li, nrow = max(length(li), NROW(df)), to_r0=to_r0, prod=prod, issues=list(), input_info=input_info)
+  if (is.null(rai) & !is.null(li))
+    rai = li[[1]]
+  if (is.null(version) & !is.null(rai)) {
+    version = rai$version
+  }
+  
+  rais = list(rai=rai, li=li, nrow = max(length(li), NROW(df)), to_r0=to_r0, prod=prod, issues=list(), input_info=input_info, finish_function=finish_function)
+
+  
   fields = c("project_dir","version","pid","json_mode")
   rais[fields] = rai[fields]
   if (is.null(df)) {
@@ -14,28 +21,72 @@ rais_init = function(li, prod=NULL, to_r0=TRUE, df=NULL, input_info=NULL) {
   }
   version = rais$version
   
-  
   project_dir = rais$project_dir
   dirs = hx_make_version_run_dir(rais)
   rais[names(dirs)] = dirs
   
   class(rais) = c("repbox_rais","list")
   rais
-  
 }
 
-rais_backup_if_incomplete = function(rais, ic_status_codes = c(429, 500, 503, 504)) {
-  restore.point("rais_backup_if_incomplete")
-  
-  status_codes = sapply(rais$li, function(rai) rai$status_code)
-  problem_codes = status_codes[status_codes %in% ic_status_codes]
-  if (length(problem_codes)>0) {
-    saveRDS(rais, file.path(rais$run_dir, "incomplete_rais.Rds"))
-    
-    cat(paste0("\n ", length(problem_codes), " of ", length(status_codes), " AI had non-availability of service problems (status code: ", paste(unique(status_codes), collapse=", "), "). Incomplete rais object saved to ", rais$run_dir))
-    return(TRUE)
+rais_finish = function(rais) {
+  if (is.null(rais$finish_function)) stop("rais$finish_function not defined")
+  do.call(rais$finish_function, list(rais=rais))
+}
+
+rai_is_run_dir_incomplete = function(run_dir) {
+  file.exists(file.path(run_dir, "incomplete_rais.Rds"))
+}
+
+rais_run_all_rai = function(rais, run_fun, fill_incomplete=isTRUE(rais$is_incomplete), backup_incomplete=TRUE, verbose = TRUE) {
+  restore.point("rais_run_all_rai")
+  if (fill_incomplete & !is.null(rais$li)) {
+    rows = rais$incomplete_rows
+  } else {
+    rows = seq_len(rais$nrow)
   }
-  return(FALSE)
+  start_time = as.numeric(Sys.time())
+  if (verbose) cat(paste0("\nMake ",NROW(rows)," AI calls "))
+  if (is.null(rais[["li"]])) {
+    rais$li = vector("list", rais$nrow)
+  }
+  for (row in rows) {
+    rais$li[[row]] = rai = run_fun(row, rais)
+    rais$li[[row]]
+  }
+  rais$li = lapply(rows, function(row) {
+    rai = run_fun(row, rais)
+    if (!isTRUE(rai$status_code==200)) {
+      if (verbose) cat("x")
+    } else {
+      if (verbose) cat(".")
+    }
+    rai
+  })
+  restore.point("rais_run_all_rai_post")
+  if (verbose) cat(paste0(round(as.numeric(Sys.time())-start_time), " sec.\n"))
+  rais$status_codes = sapply(rais$li, function(rai) {
+    if (is.null(rai)) return(-1)
+    rai$status_code
+  })
+  rais$incomplete_rows = which(!is.true(rais$status_codes == 200))
+  rais$complete_rows = which(is.true(rais$status_codes == 200))
+  
+  rais$num_incomplete = length(rais$incomplete_rows)
+  rais$num_complete =  length(rais$complete_rows)
+
+  incomplete_file = file.path(rais$run_dir, "incomplete_rais.Rds")  
+  if (backup_incomplete & rais$num_incomplete>0) {
+    if (!dir.exists(rais$run_dir)) dir.create(rais$run_dir, recursive = TRUE)
+    problem_codes = rais$status_codes[rais$status_codes != 200]
+    saveRDS(rais,incomplete_file )
+    
+    cat(paste0("\n ", length(problem_codes), " of ", length(status_codes), "  AI calls returned problems (status code: ", paste(unique(status_codes), collapse=", "), "). Incomplete rais object saved to ", rais$run_dir))
+    
+  } else if (rais$num_incomplete == 0 & file.exists(incomplete_file)) {
+    try(file.remove(incomplete_file))
+  }
+  rais
 }
 
 rais_add_issue = function(rais, type,details="") {

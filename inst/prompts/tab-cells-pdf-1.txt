@@ -1,0 +1,63 @@
+Attached is a PDF of a scientific article. Please find Table {{tabid}} with the title "{{tabtitle}}" and extract its content according to the following JSON schema:
+
+{
+  "type": "object",
+  "properties": {
+    "tabtitle": {
+      "description": "Table title",
+      "type": "string"
+    },
+    "columns": {
+      "type": "array",
+      "description": "List of all columns shown in the main part of the table. Not every row may have a value for every column and column titles may often span more than one column. Different numbers should be in different columns.",
+      "items": {
+        "properties": {
+          "col": {
+            "description": "Number of the column. Start with 1 for the first column.",
+            "type": "integer"
+          },
+          "col_desc": {
+            "description": "A short description what is shown in the column",
+            "maxLength": 100,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "cells": {
+      "type": "array",
+      "description": "Add an item for every table cell. Go through the table row-by-row and column-by-column and add the cells. Every separate line in the original is a separate row. Create separate cells for separate rows, even if you think that the text content could be merged to a single cell.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "row": {
+            "description": "The row in the table. Remember every line of text or numbers in the original table is a separate row.",
+            "type": "integer"
+          },
+          "col": {
+            "description": "The column of the cell. If it is a title column that spans more than one column enter the first column and set the colspan argument correspondingly.",
+            "type": "integer"
+          },
+          "colspan": {
+            "description": "Will usually be 1 except for title cells that span more than one column.",
+            "type": "integer"
+          },
+          "text": {
+            "description": "The cell content as text EXACTLY as given in the original table.",
+            "type": "string"
+          },
+          "content_type": {
+            "description": "Pick a content type that best describes this cell. Often cells contain numbers in brackets like (4.31). Classify them also as number",
+            "enum": ["number", "label_title", "other"],
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
+
+IMPORTANT: Make sure that you add every row of the table to your cells, also initial header rows.
+
+VERY IMPORTANT: Separate numbers into different columns. For example, we never want a cell with a content like "5.23 (3.2)" that contains both a coefficient and the standard errors. Generate extra columns even if the column header suggests that it should be just a single column.

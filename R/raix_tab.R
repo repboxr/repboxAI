@@ -4,27 +4,31 @@ example = function() {
   library(repboxAI)
   rgemini::set_gemini_api_key(file = "~/repbox/gemini/gemini_api_key.txt")
   set_ai_opts(model = "gemini-1.5-flash-001")
-  set_ai_opts(model = "gemini-2.0-flash")
-  set_ai_opts(model = "gemini-2.0-flash-lite")
   set_ai_opts(model = "gemini-2.0-flash-thinking-exp")
+  set_ai_opts(model = "gemini-2.0-flash-lite")
+  set_ai_opts(model = "gemini-2.0-flash")
   get_ai_opts()
   project_dir = "~/repbox/projects_share/aejapp_1_2_4"
-  res = raix_tab_html_pdf(project_dir, prods=prods)
+  project_dir = "~/repbox/projects_share/aejapp_1_2_7"
+  project_dir = "~/repbox/projects_share/ecta_84_2_6"
   prods = repbox_prods()
+  res = raix_tab_html_pdf(project_dir, prods=prods)
+  
   res = raix_tab_tino_pdf(project_dir, prods=prods)
   rstudioapi::filesPaneNavigate(res$run_dir)
 }
 
 #' Extracts tab_tino from articles
-raix_tab_html_pdf = function(project_dir, tpl_num=1,prods=repbox_prods(), ai_opts = get_ai_opts(), verbose=TRUE) {
+raix_tab_html_pdf = function(project_dir, tpl_num=1,prods=repbox_prods(), ai_opts = get_ai_opts(), verbose=TRUE, incomplete_rais = NULL) {
   restore.point("raix_tab_html_pdf")
-  #stop()
+  
+  
   pid = "tab_html"; prod = prods[[pid]]
   art_source = "pdf"
 
   tpl_file = file.path(repbox_ai_tpl_dir(), paste0(pid, "-", art_source, "-", tpl_num, ".txt"))
   version = rai_version(pid, ai_opts=ai_opts,tpl_file=tpl_file,json_mode = FALSE, use_schema=FALSE, art_source="pdf", tpl_num=tpl_num)
-
+ 
   inputs = rai_pick_input_prod(project_dir, c("tab_tino"))
   if (input_prod_err(inputs)) return(NULL)
 
@@ -35,31 +39,34 @@ raix_tab_html_pdf = function(project_dir, tpl_num=1,prods=repbox_prods(), ai_opt
   # For faster testing
   # df = df[1,]
 
-  tab_rows = seq_len(NROW(df))
-  if (verbose) cat("\nExtract ", NROW(df), " tables from PDF ")
-  rai_li = lapply(tab_rows, function(tab_row) {
-    if (verbose) cat(".")
-    values = as.list(df[tab_row,])
-    rai = rai_run(rai, values=values)
+  rais = rais_init(df=df, input_info=inputs, rai=rai, finish_fun = "raix_tab_html_pdf_finish")
+  
+  rais_finish(rais)
+}
+
+raix_tab_html_pdf_finish = function(rais) {
+  restore.point("raix_tab_html_pdf_finish")
+  
+  rais = rais_run_all_rai(rais, function(row, rais) {
+    values = as.list(rais$df[row,])
+    rai = rai_run(rais$rai, values=values)
+    rai    
   })
-  restore.point("post_run")
-  rais = rais_init(rai_li,df = df, input_info=inputs)
-  if (rais_backup_if_incomplete(rais)) return(NULL)
+  restore.point("rais_post_run")
+  if (rais$num_incomplete > 0 & rais$num_complete ==0) return(invisible(rais))
   
   rais = rais_combine_content(rais, var="raw_html")
   df = rais$df
   df$tabhtml = sapply(df$raw_html,html_table_add_cellnum_row_col)
-  prod_df = df_to_prod_df(df, prod)
+  prod_df = df_to_prod_df(df, get_repbox_prod("tab_html"))
   rais_save(rais, prod_df)
   hx_write_all_tables_html(prod_df, "tables.html", run_dir=rais$run_dir)
   
   #rstudioapi::filesPaneNavigate(rais$run_dir)
-
+  
   return(invisible(rais))
+  
 }
-
-
-
 
 #' Extracts tab_tino from articles
 raix_tab_tino_pdf = function(project_dir, tpl_num=1,use_schema=FALSE,  prods=repbox_prods(), ai_opts = get_ai_opts()) {

@@ -4,6 +4,9 @@ example = function() {
   library(repboxAI)
   rgemini::set_gemini_api_key(file = "~/repbox/gemini/gemini_api_key.txt")
   project_dir = "~/repbox/projects_share/aejapp_1_2_4"
+  project_dir = "~/repbox/projects_share/aejapp_1_2_7"
+  project_dir = "~/repbox/projects_share/ecta_84_2_6"
+  
   library(repboxArt)
   
   prods = repbox_prods()

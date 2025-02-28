@@ -26,7 +26,7 @@ raix_tab_html_pdf = function(project_dir, tpl_num=1,prods=repbox_prods(), ai_opt
   pid = "tab_html"; prod = prods[[pid]]
   art_source = "pdf"
 
-  tpl_file = file.path(repbox_ai_tpl_dir(), paste0(pid, "-", art_source, "-", tpl_num, ".txt"))
+  tpl_file = file.path(rai_tpl_dir(), paste0(pid, "-", art_source, "-", tpl_num, ".txt"))
   version = rai_version(pid, ai_opts=ai_opts,tpl_file=tpl_file,json_mode = FALSE, use_schema=FALSE, art_source="pdf", tpl_num=tpl_num)
  
   inputs = rai_pick_input_prod(project_dir, c("tab_tino"))
@@ -75,7 +75,7 @@ raix_tab_tino_pdf = function(project_dir, tpl_num=1,use_schema=FALSE,  prods=rep
   pid = "tab_tino"; prod = prods[[pid]]
   art_source = "pdf"
 
-  tpl_file = file.path(repbox_ai_tpl_dir(), paste0(pid, "-", art_source, "-", tpl_num, ".txt"))
+  tpl_file = file.path(rai_tpl_dir(), paste0(pid, "-", art_source, "-", tpl_num, ".txt"))
   version = rai_version(pid, ai_opts=ai_opts,tpl_file=tpl_file,json_mode =TRUE, use_schema=use_schema, art_source="pdf", tpl_num=tpl_num)
 
   # In the prompt we name variables differently to make it easier for AI

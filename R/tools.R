@@ -5,7 +5,7 @@ has_col = function(x, col) {
   col %in% names(x)
 }
 
-first.non.null = function (...) 
+first_nn = first.non.null = function (...) 
 {
   args = list(...)
   for (val in args) {

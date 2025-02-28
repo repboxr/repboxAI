@@ -20,7 +20,7 @@ raix_tab_cells_pdf = function(project_dir, tpl_num=1,prods=repbox_prods(), ai_op
   pid = "tab_html"; prod = prods[[pid]]
   art_source = "pdf"
   
-  tpl_file = file.path(repbox_ai_tpl_dir(), paste0("tab-cells-", art_source, "-", tpl_num, ".txt"))
+  tpl_file = file.path(rai_tpl_dir(), paste0("tab-cells-", art_source, "-", tpl_num, ".txt"))
   version = rai_version("tab-cells", ai_opts=ai_opts,tpl_file=tpl_file,json_mode = TRUE, use_schema=FALSE, art_source="pdf", tpl_num=tpl_num)
   version$pid = pid
   

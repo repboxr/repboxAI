@@ -11,3 +11,4 @@ source_dir = function(dir, verbose=TRUE) {
 cat("\nSource FuzzyProduction and repboxTableTools")
 source_dir("~/repbox/gemini/FuzzyProduction/R")
 source_dir("~/repbox/gemini/repboxTableTools/R")
+source_dir("~/repbox/gemini/aikit/R")

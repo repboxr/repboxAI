@@ -1,70 +1,34 @@
+rai_tpl_dir = function() {
+  system.file("prompts", package="repboxAI")
+  "~/repbox/gemini/repboxAI/inst/prompts"
+}
 
 
-# version characterizes the general parameters of the repbox AI call not specific
-# to a particular project
-# Not all general infos will be stored, e.g. not a schema object
-rai_version = function(pid, ai_opts,tpl_file=NA,json_mode=TRUE, use_schema=FALSE,  ...) {
-  schema_opt = case_when(
-    use_schema ~ "s",
-    json_mode ~ "j",
-    TRUE ~ "n"
+rai_model_short = function(model) {
+  case_when(
+    model == "gemini-2.0-flash" ~ "g2f",
+    model == "gemini-1.5-flash-001" ~ "g15f",
+    model == "gemini-2.0-flash-lite-preview-02-05" ~ "g2flp",
+    model == "gemini-2.0-flash-lite" ~ "g2fl",
+    model == "gemini-2.0-flash-thinking-exp" ~ "g2fte",
+    TRUE ~ model    
   )
-  model_short = ai_model_short(ai_opts$model)
-  vid = paste0(pid, "-",schema_opt, "-", model_short,"-", round(10*ai_opts$temperature,0))
-  extra_args = list(...)
-  restore.point("repbox_ai_version")
-  if (length(extra_args)>0) {
-    extra_str = do.call(paste, c(extra_args, list(sep="-")))
-    vid = paste0(vid, "-", extra_str)
+}
+
+rai_init = function(project_dir,json_mode=first_nn(proc_info$json_mode,FALSE), schema=NULL, values = NULL, context=NULL, media_files=NULL, tpl=NULL, tpl_file = proc_info$tpl_file,   model=ai_opts$model, temperature=ai_opts$temperature, proc_info=NULL, ai_opts=get_ai_opts() ) {
+  
+  ai_init(project_dir, json_mode=json_mode, schema=schema, values=values, context=context, media_files=media_files, tpl=tpl, tpl_file=tpl_file, model=model, temperature=temperature, ai_opts=ai_opts)
+}
+
+# Simple wrapper to ai_context
+#
+# Allow to easily add typical repbox files like art_pdf
+rai_context = function(project_dir, model=ai_opts$model, media_files =NULL, prompt=NULL, ttl_sec=60*5, add_art_pdf = FALSE, cache_context = isTRUE(ai_opts$cache_context), api_key = getOption("gemini_api_key"), ai_opts = get_ai_opts()) {
+  restore.point("rai_context")
+  if (add_art_pdf) {
+    media_files = union(repbox_art_pdf_file(project_dir), media_files)
   }
-  version = c(list(vid=vid, pid=pid,model=ai_opts$model,model_short = model_short, temperature=ai_opts$temperature, tpl_file=tpl_file, tpl_base = basename(tpl_file), json_mode=json_mode, use_schema=use_schema), extra_args)
-  version = as_tibble(version)
-  if (NROW(version)!=1) {
-    stop("Problem in rai_version. Resulting data frame should have exactly one row. Make sure you call it correctly.")
-  }
-  version
+  ai_context(project_dir,model = model, media_files=media_files, prompt=prompt, ttl_sec=ttl_sec, cache_context = cache_context, api_key=api_key, ai_opts=ai_opts)
 }
 
 
-# rai stands for repbox AI call. It contains a version object and additional information specific to the AI call
-rai_init = function(project_dir, version, schema=NULL, values = NULL, context=NULL, media_files=NULL, tpl=NULL, tpl_file = version$tpl_file, model=version$model, temperature=version$temperature, json_mode=version$json_mode) {
-  restore.point("rai_init")
-  #undebug(to_json_schema)
-  schema = to_json_schema(schema)
-  if (is.null(tpl) & !is.null(tpl_file)) {
-    tpl = merge.lines(suppressWarnings(readLines(tpl_file)))
-  } else if (is.null(tpl)) {
-    stop("provide a template tpl or tpl_file or haver version$tpl_file filled.")
-  }
-
-  rai = list(project_dir = project_dir, tpl=tpl, model=model, schema=schema, json_mode=version$json_mode, temperature=temperature, media_files=media_files, version=version, context=context)
-}
-
-rai_run = function(rai, values=rai$values, verbose=FALSE) {
-  restore.point("rai_run")
-  if (is.null(rai[["prompt"]]))
-    rai = rai_glue(rai, values)
-
-  if (!startsWith(rai$model,"gemini")) {
-    stop(paste0("Cannot yet run model ", model))
-  }
-
-  library(rgemini)
-  rai$media = repbox_ai_media(rai$project_dir, rai$media_files, verbose=verbose)
-
-  rai$time_stamp = Sys.time()
-  res = run_gemini(rai$prompt, model=rai$model,context=rai$context, response_schema = rai[["schema"]], json_mode=rai$json_mode,temperature = rai$temperature, media = rai$media,detailed_results=TRUE,verbose=FALSE)
-  rai[names(res)] = res
-
-  restore.point("rai_run_post")
-
-  rai$run_sec = as.numeric(Sys.time()) - as.numeric(rai$time_stamp)
-
-  if (isTRUE(rai$has_error)) {
-    if (verbose)
-      cat("\n",rai$err_msg,"\n")
-  }
-  class(rai) = c("repbox_rai","list")
-
-  return(rai)
-}

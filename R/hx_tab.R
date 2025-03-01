@@ -40,6 +40,6 @@ hx_tab_html = function(project_dir, prods=repbox_prods(), to_r0=TRUE, add_cell_l
   hx_backport_save(hx, prods[["tab_tino"]], prod_df)
   hx_backport_save(hx, prods[["tab_list"]], prod_df)
   hx_tab_html_to_cell_list(hx=hx, prod_df=prod_df)
-  hx_write_all_tables_html(prod_df, "tables.html",run_dir = hx$run_dir)
+  rai_write_all_tables_html(prod_df, "tables.html",run_dir = hx$run_dir)
   invisible(hx)
 }

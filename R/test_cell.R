@@ -29,7 +29,7 @@ test_cell_base = function(run_dir, prod_df=rai_load_prod_df(run_dir=run_dir), pr
   
   # create HTML output
   tab_df = cells_to_tabhtml(cell_df, add_flags=TRUE)
-  hx_write_all_tables_html(tab_df, "table_test.html", run_dir=run_dir, title="Tests: cell_base")
+  rai_write_all_tables_html(tab_df, "table_test.html", run_dir=run_dir, title="Tests: cell_base")
   rstudioapi::filesPaneNavigate(run_dir)
 }
 

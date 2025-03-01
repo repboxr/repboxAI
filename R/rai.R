@@ -31,4 +31,9 @@ rai_context = function(project_dir, model=ai_opts$model, media_files =NULL, prom
   ai_context(project_dir,model = model, media_files=media_files, prompt=prompt, ttl_sec=ttl_sec, cache_context = cache_context, api_key=api_key, ai_opts=ai_opts)
 }
 
+rai_run = function(rai,values=rai$values, verbose=FALSE) {
+  restore.point("rai_run")
+  rai = ai_run(rai, values, verbose)
+  rai
+}
 

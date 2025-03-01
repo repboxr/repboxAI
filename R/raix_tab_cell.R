@@ -50,7 +50,7 @@ raix_tab_cells_pdf = function(project_dir, tpl_num=1,prods=repbox_prods(), ai_op
   df$tabhtml = sapply(df$raw_html,html_table_add_cellnum_row_col)
   prod_df = df_to_prod_df(df, prod)
   rais_save(rais, prod_df)
-  hx_write_all_tables_html(prod_df, "tables.html", run_dir=rais$run_dir)
+  rai_write_all_tables_html(prod_df, "tables.html", run_dir=rais$run_dir)
   
   #rstudioapi::filesPaneNavigate(rais$run_dir)
   

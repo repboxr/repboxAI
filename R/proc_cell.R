@@ -3,10 +3,15 @@ example = function() {
   project_dir = "~/repbox/projects_share/aejapp_1_2_4"
   proc_all_tab_html_to_cell_list(project_dir, overwrite=TRUE)
   proc_all_cell_list_to_cell_base(project_dir, overwrite=TRUE)
+  
+  project_dirs = list.dirs("~/repbox/projects_share", full.names = TRUE,recursive = FALSE)
+  proc_all_tab_html_to_cell_list(project_dirs)
+  proc_all_cell_list_to_cell_base(project_dirs)
+  rstudioapi::filesPaneNavigate(project_dir)
 }
 
 proc_all_tab_html_to_cell_list = function(project_dir, overwrite=FALSE) {
-  ddp_derive_all_instances(project_dir, from_pid = "tab_html", to_pid = "cell_list",convert_fun = proc_tab_html_to_cell_list, overwrite=overwrite)
+  ddp_derive_all_instances(project_dir, from_prod_id = "tab_html", to_prod_id = "cell_list",convert_fun = proc_tab_html_to_cell_list, overwrite=overwrite)
 }
 
 
@@ -34,15 +39,15 @@ proc_tab_html_to_cell_list = function(pru=NULL, ver_dir=pru$ver_dir, prods=repbo
 
 proc_all_cell_list_to_cell_base = function(project_dir, overwrite=FALSE) {
   restore.point("proc_all_cell_list_to_cell_base")
-  ddp_derive_all_instances(project_dir, from_pid = "cell_list", to_pid = "cell_base",convert_fun = proc_cell_list_to_cell_base, overwrite=overwrite)
+  ddp_derive_all_instances(project_dir, from_prod_id = "cell_list", to_prod_id = "cell_base",convert_fun = proc_cell_list_to_cell_base, overwrite=overwrite)
 }
 
 
-proc_cell_list_to_cell_base = function(pru=NULL, ver_dir=pru$ver_dir, prods=repbox_prods(), prod_df=pru$prod_df, version=pru$version) {
+proc_cell_list_to_cell_base = function(pru=NULL, ver_dir=pru$ver_dir, prods=repbox_prods(), prod_df=pru$prod_df) {
   restore.point("proc_cell_list_to_cell_base")
   cell_df = fp_load_prod_df(ver_dir=ver_dir, prod_df=prod_df)
   prod = get_repbox_prod("cell_base", prods)
-  pru = ddp_init_pru(pru, ver_dir=ver_dir,ddp_pid="cell_base", version = version)
+  pru = ddp_init_pru(pru, ver_dir=ver_dir,ddp_prod_id="cell_base")
   prod_df = cell_list_to_cell_base_prod(cell_df, prod=prod)
   pru = pru_save(pru,prod_df)
   #rstudioapi::filesPaneNavigate(pru$ver_dir)

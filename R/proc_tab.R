@@ -28,6 +28,8 @@ project_dir_to_fp_dir = function(project_dir) {
 #' Extracts tab_tino from articles
 proc_tab_html_pdf = function(project_dir, tpl_num=1,prods=repbox_prods(), ai_opts = get_ai_opts(), verbose=TRUE, incomplete_pru = NULL, to_v0=TRUE) {
   restore.point("proc_tab_html_pdf")
+  if (!rai_has_input(project_dir, "pdf","tab_tino")) return(NULL)
+  
   prod_id = "tab_html"
   art_source = "pdf"
   tpl_file = file.path(rai_tpl_dir(), paste0(prod_id, "-", art_source, "-", tpl_num, ".txt"))
@@ -71,11 +73,11 @@ pru_tab_html_pdf_run = function(pru) {
 
 #' Extracts tab_tino from articles
 proc_tab_tino_pdf = function(project_dir, tpl_num=1,use_schema=FALSE, to_v0=TRUE, ai_opts = get_ai_opts()) {
-  if (!rai_check_pdf_file(project_dir)) return(invisible())
+  if (!rai_has_input(project_dir, "pdf")) return(NULL)
   
   fun_call = preserve_call("proc_tab_tino_pdf")
-  
   restore.point("proc_tab_tino_pdf")
+  
   prod_id = "tab_tino"
   art_source = "pdf"
   tpl_file = file.path(rai_tpl_dir(), paste0(prod_id, "-", art_source, "-", tpl_num, ".txt"))

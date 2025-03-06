@@ -37,3 +37,37 @@ rai_run = function(rai,values=rai$values, verbose=FALSE) {
   rai
 }
 
+
+
+
+rai_has_input = function(project_dir, ...) {
+  inputs = list(...)
+  restore.point("rai_has_input")
+  fp_dir = project_dir_to_fp_dir(project_dir)
+  for (inp in inputs) {
+    if (isTRUE(inp=="pdf")) {
+      if (!rai_has_pdf_file(project_dir)) return(FALSE)
+    } else if (is.character(inp)) {
+      inp = list(prod_id = inp)
+    }
+    if (is.list(inp)) {
+      ok = fp_has_input(fp_dir, inp$prod_id, inp$proc_id)
+      if (!ok) {
+        cat("\nRequired input ", inp$prod_id, " not found for ", project_dir,"\n")
+        return(FALSE)
+      }
+    }
+  }
+  return(TRUE)
+}
+
+rai_has_pdf_file = function(project_dir) {
+  pdf_dir = file.path(project_dir, "art", "pdf")
+  pdf_files = list.files(pdf_dir, glob2rx("*.pdf"), full.names = TRUE)
+  if (length(pdf_files) == 0) {
+    cat("\n", project_dir, " has no article pdf file.\n")
+    return(FALSE)
+  }
+  return(TRUE)
+}
+

@@ -22,6 +22,57 @@ example = function() {
   cat(html_tab)
 }
 
+xml_all_text <- function(node) {
+  # Select all nodes (elements, text nodes, etc.) in the subtree including the node itself.
+  nodes <- xml_find_all(node, "descendant-or-self::node()")
+  
+  # For each node, extract its text content (trimming any extra whitespace)
+  texts <- vapply(nodes, function(n) xml_text(n, trim = TRUE), character(1))
+  
+  # Remove any empty strings and return the result as a character vector.
+  texts[nzchar(texts)]
+}
+  
+
+xml_set_inner_html <- function(node, new_html) {
+  restore.point("xml_set_inner_html")
+  # Remove all current children of the node
+  xml_remove(xml_children(node))
+  
+  # Wrap the new HTML in a dummy element to ensure proper parsing
+  dummy <- paste0("<dummy>", html_escape(new_html), "</dummy>")
+  fragment <- read_xml(dummy)
+  
+  # Get the children of the dummy element
+  new_children <- xml_children(fragment)
+  
+  # Append each new child to the original node
+  for (child in new_children) {
+    xml_add_child(node, child)
+  }
+}
+
+html_table_cells_to_text <- function(tabhtml, all_text = FALSE) {
+  restore.point("html_table_cells_to_text")
+  # Parse the input HTML string.
+  table_node <- xml2::read_html(tabhtml)
+
+  # Find all <td> and <th> cells in the table.
+  cell_nodes <- xml2::xml_find_all(table_node, ".//td | .//th")
+  for (node in cell_nodes) {
+    # Extract plain text (ignoring inner HTML elements)
+    if (all_text) {
+      text_content = paste0(unique(trimws(xml_all_text(node))), collapse="")
+    } else {
+      text_content <- xml2::xml_text(node)
+    }
+    # Set the cell's text, replacing all child nodes
+    xml_set_inner_html(node, text_content)
+  }
+  
+  # Return the modified HTML string.
+  as.character(table_node)
+}
 
 html_table_add_cellnum_row_col <- function(html, id_prefix = "cell-") {
   library(xml2)
@@ -167,15 +218,18 @@ rai_write_all_tables_html = function(tab_df,html_file=NULL, html_col = "tabhtml"
   style = "<style> 
   table { border-spacing: 0px; border-collapse: collapse;}
   table td {padding-left: 4px; padding-right: 4px; padding-top: 2px; padding-bottom: 2px; border: 1px solid lightgray;} </style>"
-  head = style
+  meta_head = '<head><meta charset="UTF-8"></head>'
+  head = paste0(meta_head, "\n", style)
   if (!is.null(title)) head = paste0(head,"<h1>", title, "</h1>")
   if (!is.null(out_dir)) head = paste0(head,"<p><pre>", out_dir, "</pre></p>")
   tab_html = paste0(paste0("<h2>Table ", tab_df$tabid,"</h2>", tab_df$tabhtml,"<br>", collapse = "\n"))
   foot = ""
-  if (is.null(info) & !is.null(out_dir)) {
+  if (!is.null(info) & !is.null(out_dir)) {
     info = as.list(info)
     foot = paste0(foot, "<ul>", paste0("<li>",names(info), ": ", info, " </li>", collapse="\n"),"</ul>")
   }
+
+  
   html = paste0(head, "\n", tab_html, foot)
   if (is.null(html_file)) return(invisible(html))
   if (basename(html_file)==html_file & !is.null(out_dir)) html_file = file.path(out_dir, html_file)
@@ -185,3 +239,42 @@ rai_write_all_tables_html = function(tab_df,html_file=NULL, html_col = "tabhtml"
   
 }
 
+
+html_escape <- function(text) {
+  if (is.null(text) || length(text) == 0) {
+    return(text)
+  }
+  
+  # Convert to character if not already
+  text <- as.character(text)
+  
+  # Use stringi's vectorization capabilities directly
+  # Note: Order matters - & must be replaced first to avoid double-escaping
+  text <- stringi::stri_replace_all_fixed(text, "&", "&amp;")
+  text <- stringi::stri_replace_all_fixed(text, "<", "&lt;")
+  text <- stringi::stri_replace_all_fixed(text, ">", "&gt;")
+  text <- stringi::stri_replace_all_fixed(text, "\"", "&quot;")
+  text <- stringi::stri_replace_all_fixed(text, "'", "&#39;")
+  
+  return(text)
+}
+
+
+html_unescape <- function(text) {
+  if (is.null(text) || length(text) == 0) {
+    return(text)
+  }
+  
+  # Convert to character if not already
+  text <- as.character(text)
+  
+  # Replace HTML entities with their corresponding characters
+  # Note: Order matters - & must be replaced last to avoid issues with other entities
+  text <- stringi::stri_replace_all_fixed(text, "&quot;", "\"")
+  text <- stringi::stri_replace_all_fixed(text, "&#39;", "'")
+  text <- stringi::stri_replace_all_fixed(text, "&lt;", "<")
+  text <- stringi::stri_replace_all_fixed(text, "&gt;", ">")
+  text <- stringi::stri_replace_all_fixed(text, "&amp;", "&")
+  
+  return(text)
+}

@@ -13,20 +13,20 @@
 #' tab_html to cell_list
 #' We then may want to simply keep the version and run names of 
 #' the original run and just change the product. 
-ddp_get_run_dir = function(run_dir, ddp_pid) {
-  run_id = basename(run_dir)
-  vid = basename(dirname(run_dir))
-  ddp_run_dir = file.path(project_dir, "rai/prod_runs/",ddp_pid, vid, run_id)
+ddp_get_ver_dir = function(ver_dir, ddp_prod_id) {
+  run_id = basename(ver_dir)
+  vid = basename(dirname(ver_dir))
+  ddp_ver_dir = file.path(project_dir, "rai/prod_runs/",ddp_prod_id, vid, run_id)
 }
 
-ddp_is_up_to_date = function(run_dir, ddp_pid) {
+ddp_is_up_to_date = function(ver_dir, ddp_prod_id) {
   restore.point("ddp_is_up_to_date")
-  ddp_run_dir = hx_run_dir_to_derived_prod(run_dir, "cell_list")
-  if (!dir.exists(ddp_run_dir)) return(FALSE)
-  ddp_file = file.path(ddp_run_dir,"prod_df.Rds")
+  ddp_ver_dir = hx_ver_dir_to_derived_prod(ver_dir, "cell_list")
+  if (!dir.exists(ddp_ver_dir)) return(FALSE)
+  ddp_file = file.path(ddp_ver_dir,"prod_df.Rds")
   if (!file.exists(ddp_file)) return(FALSE)
   
-  file = file.path(run_dir, "prod_df.Rds")
+  file = file.path(ver_dir, "prod_df.Rds")
   if (isTRUE(file.mtime(ddp_file) >= file.mtime(file))) return(TRUE)
   return(FALSE)
 }
@@ -35,37 +35,33 @@ ddp_is_up_to_date = function(run_dir, ddp_pid) {
 #' tab_html to cell_list
 #' We then may want to simply keep the version and run names of 
 #' the original run and just change the product. 
-ddp_init_hx = function(hx=NULL, ddp_pid, prods = repbox_prods(), version=hx$version, run_dir=hx$run_dir) {
-  restore.point("hx_to_ddp_prod")
-  if (is.null(run_dir)) stop("You must provide at least run_dir (original run_dir). Or the complete original hx / rais object.")
-  if (is.null(project_dir)) project_dir = str.left.of(run_dir, "rai/prod_runs/")
-  if (is.null(version)) {
-    version = readRDS(file.path(run_dir, "version.Rds"))
-  }
-  input_info = data.frame(pid=version$pid, run_dir = run_dir, found=TRUE, num_cand = 1)
-  version$pid = ddp_pid
-  ddp_prod = prods[ddp_pid]
+ddp_init_pru = function(pru, ddp_prod_id, prods = repbox_prods(), ver_dir=pru$ver_dir, prod_id = pru$prod_id) {
+  restore.point("ddp_init_pru")
+  if (is.null(ver_dir)) stop("You must provide at least ver_dir (original ver_dir). Or the complete original pru / rais object.")
+  input_info = data.frame(prod_id=prod_id, ver_dir = ver_dir, found=TRUE, num_cand = 1)
+  ddp_prod = prods[ddp_prod_id]
   
-  ddp_run_dir = ddp_get_run_dir(run_dir, ddp_pid) 
-  ddp_hx = hx_init(project_dir, version, prod,input_info=input_info, run_dir=ddp_run_dir)
-  ddp_hx
+  fp_dir = dirname(dirname(dirname(ver_dir)))
+  ddp_ver_dir = ddp_get_ver_dir(ver_dir, ddp_prod_id) 
+  ddp_pru = pru_init(fp_dir = fp_dir, prod_id=ddp_prod_id, input_info=input_info, ver_dir=ddp_ver_dir)
+  ddp_pru
 }
 
 #' Derives all ddp instances
 #' 
 #' Will be typically called from a wrapper function like \code{hx_all_tab_html_to_cell_list}
 #' 
-ddp_derive_all_instances = function(project_dir,from_pid, to_pid, convert_fun,  overwrite=FALSE) {
+ddp_derive_all_instances = function(project_dir,from_prod_id, to_prod_id, convert_fun,  overwrite=FALSE) {
   restore.point("ddp_derive_all_instances")
-  from_parent_dir = file.path(project_dir, "rai/prod_runs", from_pid)
+  from_parent_dir = file.path(project_dir, "rai/prod_runs", from_prod_id)
   from_files = list.files(from_parent_dir, glob2rx("prod_df.Rds"),full.names = TRUE, recursive=TRUE) 
   file = from_files[1]
   for (file in from_files) {
-    run_dir = dirname(file)
+    ver_dir = dirname(file)
     if (!overwrite) {
-      if (ddp_is_up_to_date(run_dir, to_pid)) next
+      if (ddp_is_up_to_date(ver_dir, to_prod_id)) next
     }
-    convert_fun(run_dir = run_dir)
+    convert_fun(ver_dir = ver_dir)
   }
 }
 

@@ -9,8 +9,9 @@ example = function() {
   set_ai_opts(model = "gemini-2.0-flash")
   get_ai_opts()
   project_dir = "~/repbox/projects_share/aejapp_1_2_4"
-  project_dir = "~/repbox/projects_share/ecta_84_2_6"
   project_dir = "~/repbox/projects_share/aejapp_1_2_7"
+  project_dir = "~/repbox/projects_share/ecta_84_2_6"
+  project_dir = "~/repbox/projects_share/jeea_12_1_11"
   
   res = proc_tab_tino_pdf(project_dir)
   res = proc_tab_html_pdf(project_dir)
@@ -70,16 +71,19 @@ pru_tab_html_pdf_run = function(pru) {
 
 #' Extracts tab_tino from articles
 proc_tab_tino_pdf = function(project_dir, tpl_num=1,use_schema=FALSE, to_v0=TRUE, ai_opts = get_ai_opts()) {
+  if (!rai_check_pdf_file(project_dir)) return(invisible())
+  
+  fun_call = preserve_call("proc_tab_tino_pdf")
+  
   restore.point("proc_tab_tino_pdf")
-  # stop()
-  prod_id = "tab_tino"; prod = prods[[prod_id]]
+  prod_id = "tab_tino"
   art_source = "pdf"
   tpl_file = file.path(rai_tpl_dir(), paste0(prod_id, "-", art_source, "-", tpl_num, ".txt"))
 
   proc_info = rai_make_proc_info(prod_id=prod_id,ai_opts = ai_opts,tpl_file = tpl_file, json_mode=TRUE, use_schema = use_schema)
   
   fp_dir = project_dir_to_fp_dir(project_dir)
-  pru = pru_init(fp_dir,prod_id,proc_info=proc_info,to_v0=to_v0)
+  pru = pru_init(fp_dir,prod_id,proc_info=proc_info,to_v0=to_v0, fun_call=fun_call)
   
   
   # In the prompt we name variables differently to make it easier for AI
@@ -91,12 +95,14 @@ proc_tab_tino_pdf = function(project_dir, tpl_num=1,use_schema=FALSE, to_v0=TRUE
   }
   context = rai_context(project_dir, add_art_pdf = TRUE)
   pru$rai = rai_init(project_dir, proc_info = proc_info, schema=schema, context=context)
-  pru_next_stage(pru, "proc_tab_tino_pdf_run")
-}
+  
+#'   pru_next_stage(pru, "proc_tab_tino_pdf_run")
+#' }
+#' 
+#' #' Extracts tab_tino from articles
+#' proc_tab_tino_pdf_run = function(pru) {
+#'   restore.point("proc_tab_tino_pdf_run")
 
-#' Extracts tab_tino from articles
-proc_tab_tino_pdf_run = function(pru) {
-  restore.point("proc_tab_tino_pdf_run")
   pru$rai = rai_run(pru$rai)
   pru = pru_set_status(pru, pru$rai)
   if (!pru_is_ok(pru)) return(invisible(pru))

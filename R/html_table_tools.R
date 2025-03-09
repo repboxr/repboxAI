@@ -23,6 +23,8 @@ example = function() {
 }
 
 xml_all_text <- function(node) {
+  return(rvest::html_text2(node))
+  
   # Select all nodes (elements, text nodes, etc.) in the subtree including the node itself.
   nodes <- xml_find_all(node, "descendant-or-self::node()")
   
@@ -33,44 +35,34 @@ xml_all_text <- function(node) {
   texts[nzchar(texts)]
 }
   
-
-xml_set_inner_html <- function(node, new_html) {
-  restore.point("xml_set_inner_html")
-  # Remove all current children of the node
-  xml_remove(xml_children(node))
-  
-  # Wrap the new HTML in a dummy element to ensure proper parsing
-  dummy <- paste0("<dummy>", html_escape(new_html), "</dummy>")
-  fragment <- read_xml(dummy)
-  
-  # Get the children of the dummy element
-  new_children <- xml_children(fragment)
-  
-  # Append each new child to the original node
-  for (child in new_children) {
-    xml_add_child(node, child)
-  }
+example = function() {
+  tabhtml = "<table><td> My text <span>is here</span>, right?</td></table>"
+  tabhtml = '<table><td style="text-align: right;"><span class="math inline">(16.7)</span></td></table>'
+  html_table_cells_to_text(tabhtml, all_text=TRUE)
 }
 
-html_table_cells_to_text <- function(tabhtml, all_text = FALSE) {
+html_table_cells_to_text <- function(tabhtml, all_text = TRUE) {
   restore.point("html_table_cells_to_text")
   # Parse the input HTML string.
-  table_node <- xml2::read_html(tabhtml)
+  
+  doc = read_html(tabhtml)
+  table_node = rvest::html_element(doc, "table")
 
   # Find all <td> and <th> cells in the table.
   cell_nodes <- xml2::xml_find_all(table_node, ".//td | .//th")
+  node = cell_nodes[[1]]
   for (node in cell_nodes) {
-    # Extract plain text (ignoring inner HTML elements)
     if (all_text) {
       text_content = paste0(unique(trimws(xml_all_text(node))), collapse="")
     } else {
       text_content <- xml2::xml_text(node)
     }
-    # Set the cell's text, replacing all child nodes
-    xml_set_inner_html(node, text_content)
+    # Remove all child nodes
+    xml_remove(xml_children(node))
+    # Set the new text content
+    xml_text(node) <- text_content
+    as.character(node)
   }
-  
-  # Return the modified HTML string.
   as.character(table_node)
 }
 
@@ -172,16 +164,21 @@ library(rvest)
 library(dplyr)
 
 normalized_html_tab_to_cell_df <- function(html) {
+  restore.point("normalized_html_tab_to_cell_df")
   # Parse HTML
   doc <- read_html(html)
   
-  # Extract all td elements
-  cells <- html_elements(doc, "td")
+  # Extract all td and th elements
+  #cells <- html_elements(doc, "td")
+  cells <- html_elements(doc, "td, th")
   
   # Extract attributes and text content vectorized
   cell_ids <- html_attr(cells, "id")
   cell_classes <- html_attr(cells, "class")
-  cell_content <- html_text(cells, trim = TRUE)
+  cell_html <- as.character(cells)
+  cell_inner_html <- stri_match_first_regex(cell_html, "<(?:td|th)[^>]*>(.*?)</(?:td|th)>")[,2]
+  cell_inner_html = na_val(cell_inner_html, "")
+  cell_text = html_text2(cells)
   cell_colspan <- as.integer(html_attr(cells, "colspan"))
   cell_colspan[is.na(cell_colspan)] <- 1  # Default colspan is 1
 
@@ -200,7 +197,9 @@ normalized_html_tab_to_cell_df <- function(html) {
     col = col_nums,
     colspan = cell_colspan,
     rowspan = cell_rowspan,
-    content = cell_content,
+    html = cell_html,
+    inner_html = cell_inner_html,
+    text = cell_text,
     stringsAsFactors = FALSE
   )
   

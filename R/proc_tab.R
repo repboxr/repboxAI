@@ -13,7 +13,7 @@ example = function() {
   project_dir = "~/repbox/projects_share/ecta_84_2_6"
   project_dir = "~/repbox/projects_share/jeea_12_1_11"
   
-  res = proc_tab_tino_pdf(project_dir)
+  res = proc_tab_notes_pdf(project_dir)
   res = proc_tab_html_pdf(project_dir)
   
   rstudioapi::filesPaneNavigate(res$ver_dir)
@@ -25,10 +25,10 @@ project_dir_to_fp_dir = function(project_dir) {
 }
 
 
-#' Extracts tab_tino from articles
+#' Extracts tab_html from articles
 proc_tab_html_pdf = function(project_dir, tpl_num=1,prods=repbox_prods(), ai_opts = get_ai_opts(), verbose=TRUE, incomplete_pru = NULL, to_v0=TRUE) {
   restore.point("proc_tab_html_pdf")
-  if (!rai_has_input(project_dir, "pdf","tab_tino")) return(NULL)
+  if (!rai_has_input(project_dir, "pdf","tab_list")) return(NULL)
   
   prod_id = "tab_html"
   art_source = "pdf"
@@ -39,7 +39,7 @@ proc_tab_html_pdf = function(project_dir, tpl_num=1,prods=repbox_prods(), ai_opt
   fp_dir = project_dir_to_fp_dir(project_dir)
   pru = pru_init(fp_dir,prod_id,proc_info=proc_info,to_v0=to_v0)
 
-  pru = pru_pick_inputs(pru, "tab_tino")
+  pru = pru_pick_inputs(pru, "tab_list")
   if (pru_has_input_err(pru)) return(pru)
 
   context = rai_context(project_dir, add_art_pdf = TRUE)
@@ -49,7 +49,7 @@ proc_tab_html_pdf = function(project_dir, tpl_num=1,prods=repbox_prods(), ai_opt
 
 pru_tab_html_pdf_run = function(pru) {
   restore.point("pru_tab_html_pdf_ai_run")
-  df = pru_get_input(pru, "tab_tino")
+  df = pru_get_input(pru, "tab_list")
   pru = pru_make_items(pru, df=df, function(row, pru,...) {
     values = as.list(df[row,])
     ai_run(pru$rai, values=values)
@@ -71,14 +71,14 @@ pru_tab_html_pdf_run = function(pru) {
 }
 
 
-#' Extracts tab_tino from articles
-proc_tab_tino_pdf = function(project_dir, tpl_num=1,use_schema=FALSE, to_v0=TRUE, ai_opts = get_ai_opts()) {
+#' Extracts tab_list and tab_notes from articles
+proc_tab_notes_pdf = function(project_dir, tpl_num=1,use_schema=FALSE, to_v0=TRUE, ai_opts = get_ai_opts()) {
   if (!rai_has_input(project_dir, "pdf")) return(NULL)
   
-  fun_call = preserve_call("proc_tab_tino_pdf")
-  restore.point("proc_tab_tino_pdf")
+  fun_call = preserve_call("proc_tab_notes_pdf")
+  restore.point("proc_tab_notes_pdf")
   
-  prod_id = "tab_tino"
+  prod_id = "tab_notes"
   art_source = "pdf"
   tpl_file = file.path(rai_tpl_dir(), paste0(prod_id, "-", art_source, "-", tpl_num, ".txt"))
 
@@ -98,17 +98,10 @@ proc_tab_tino_pdf = function(project_dir, tpl_num=1,use_schema=FALSE, to_v0=TRUE
   context = rai_context(project_dir, add_art_pdf = TRUE)
   pru$rai = rai_init(project_dir, proc_info = proc_info, schema=schema, context=context)
   
-#'   pru_next_stage(pru, "proc_tab_tino_pdf_run")
-#' }
-#' 
-#' #' Extracts tab_tino from articles
-#' proc_tab_tino_pdf_run = function(pru) {
-#'   restore.point("proc_tab_tino_pdf_run")
-
   pru$rai = rai_run(pru$rai)
   pru = pru_set_status(pru, pru$rai)
   if (!pru_is_ok(pru)) return(invisible(pru))
-  prod = get_repbox_prod("tab_tino")
+  prod = get_repbox_prod(prod_id)
   prod_df = df_to_prod_df(pru$rai$content, prod, prod_to_df_cols = pru$prod_to_df_cols)
   old_tabid = prod_df$tabid
   prod_df$tabid = tabid_normalize(prod_df$tabid)
@@ -118,6 +111,8 @@ proc_tab_tino_pdf = function(project_dir, tpl_num=1,use_schema=FALSE, to_v0=TRUE
   
   prod_df$otabid = tabid_to_otabid(prod_df$tabid)
   pru = pru_save(pru, prod_df)
+  
+  pru_backport_save(pru, prods[["tab_list"]], prod_df=prod_df)
   rstudioapi::filesPaneNavigate(pru$ver_dir)
   return(invisible(pru))
 }

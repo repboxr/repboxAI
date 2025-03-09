@@ -16,7 +16,7 @@ proc_all_tab_html_to_cell_list = function(project_dir, overwrite=FALSE) {
 
 
 # cell_list is a derived prod of tab_html
-proc_tab_html_to_cell_list = function(pru=NULL, ver_dir=pru$ver_dir, prods=repbox_prods(), prod_df=pru$prod_df) {
+proc_tab_html_to_cell_list = function(pru=NULL, ver_dir=pru$ver_dir, prods=repbox_prods(), prod_df=pru$prod_df, also_cell_base=FALSE) {
   restore.point("proc_tab_html_to_cell_list")
   prod = prods[["cell_list"]]
   df = fp_load_prod_df(ver_dir=ver_dir, prod_df=prod_df)
@@ -25,15 +25,20 @@ proc_tab_html_to_cell_list = function(pru=NULL, ver_dir=pru$ver_dir, prods=repbo
   i = 1
   cell_df = bind_rows(lapply(seq_len(NROW(df)), function(i) {
     restore.point("shkfjhksfdo")
-    cell_df = normalized_html_tab_to_cell_df(df$tabhtml[[i]]) %>% rename(text=content)
+    cell_df = normalized_html_tab_to_cell_df(df$tabhtml[[i]])
     cell_df = add_col_left(cell_df, tabid=df$tabid[i],otabid = df$otabid[i])
     cell_df$cellid = paste0(df$tabid[i],"_", stri_sub(cell_df$cellid,6))
     cell_df      
   }))
   prod_df = df_to_prod_df(cell_df, prod)
   pru = pru_save(pru,prod_df)
+  
+  if (also_cell_base) {
+    pru = proc_cell_list_to_cell_base(pru)
+  }
   #rstudioapi::filesPaneNavigate(pru$ver_dir)
-  invisible(pru)  
+  invisible(pru)
+  
 }
 
 
@@ -56,7 +61,7 @@ proc_cell_list_to_cell_base = function(pru=NULL, ver_dir=pru$ver_dir, prods=repb
 
 
 cell_list_to_cell_base_prod = function(cell_list, prod=repbox_prods()[["cell_base"]]) {
-  restore.point("cell_df_to_cell_base_prof")
+  restore.point("cell_list_to_cell_base_prod")
   # From repboxTableTools
   cell_df = cells_add_cell_base(cell_list)
   df_to_prod_df(cell_df,  prod)

@@ -7,5 +7,5 @@ Maintainer: Sebastian Kranz <sebastian.kranz@uni-ulm.de>
 Description: AI production chain for repbox
 License: GPL>= 20.
 Encoding: UTF-8
-Depends: repboxUtils, repboxDB, DataSchema, rgemini, digest
+Depends: repboxUtils, repboxDB, DataSchema, rgemini, digest, xml2
 LazyData: true

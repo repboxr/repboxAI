@@ -15,7 +15,8 @@ example = function() {
 test_all_cell_base = function(project_dir, overwrite=FALSE) {
   tests = tests = define_tests_cell_base()
   prod = get_repbox_prod("cell_base")
-  ver_dirs = rai_all_ver_dirs(project_dir, "cell_base")
+  fp_dir = project_dir_to_fp_dir(project_dir)
+  ver_dirs = fp_all_ver_dirs(fp_dir, "cell_base")
   for (ver_dir in ver_dirs) {
     test_cell_base(ver_dir,prod=prod, tests=tests)
   }

@@ -18,26 +18,29 @@ repbox_prods = function() {
       descr = "List of article's tables",
       list(
         tabid = schema_str(is_key=TRUE,maxLength = 10),
-        otabid = schema_str() # ordered tabid by augmenting numbers with 0s from left
+        otabid = schema_str(), # ordered tabid by augmenting numbers with 0s from left
+        tabtitle = schema_str(maxLength=400)
       ),
       keys = "tabid",
       order_by = "otabid"
-      
     ),
-    prod_define("tab_tino",
+    prod_define("tab_notes",
       descr = "List of article's tables with extracted title and table notes",
       widens = "tab_list",
       list(
-        tabtitle = schema_str(maxLength=400),
         tabnotes = schema_str(maxLength=2000)
       )
     ),
     prod_define("tab_html",
       descr = "Contains normalized HTML of every extracted article table",
-      widens = "tab_tino",
+      widens = "tab_list",
       list(
         tabhtml = schema_html_tab()
       )
+    ),
+    prod_define("tab_main",
+      descr = "Article tables with html, title and notes",
+      widens = c("tab_html","tab_notes")          
     ),
     prod_define(
       "cell_list",
@@ -48,6 +51,7 @@ repbox_prods = function() {
         cellid = schema_str(),
         row = schema_int(),
         col = schema_int(),
+        inner_html = schema_str(),
         text = schema_str(),
         colspan = schema_int(),
         rowspan = schema_int()

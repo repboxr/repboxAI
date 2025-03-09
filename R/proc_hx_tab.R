@@ -16,9 +16,9 @@ example = function() {
   project_dir = "~/repbox/projects_share/restud_82_2_12" 
   
   
-  library(repboxRun)
-  steps = repbox_steps_from(art = TRUE,reproduction = FALSE)
-  repbox_run_project(project_dir,lang="stata", steps=steps)
+  #library(repboxRun)
+  #steps = repbox_steps_from(art = TRUE,reproduction = FALSE)
+  #repbox_run_project(project_dir,lang="stata", steps=steps)
   
   
   library(repboxArt)
@@ -41,7 +41,7 @@ proc_tab_html_hx = function(project_dir, prods=repbox_prods(), to_v0=TRUE, add_c
     return(invisible())
   }
   restore.point("proc_tab_html_hx")
-  prod_id = "tab_html"; prod = prods[[prod_id]]
+  prod_id = "tab_main"; prod = prods[[prod_id]]
   df = repbox_art_load_tabs_from_route(project_dir, route)
   if (has_col(df,"tab_html")) { # pdf extracted
     df$raw_tabhtml = df$tab_html
@@ -75,8 +75,9 @@ proc_tab_html_hx = function(project_dir, prods=repbox_prods(), to_v0=TRUE, add_c
   prod_df$otabid = tabid_to_otabid(prod_df$tabid)
   
   pru = pru_save(pru, prod_df)
-  pru_backport_save(pru, prods[["tab_tino"]], prod_df)
   pru_backport_save(pru, prods[["tab_list"]], prod_df)
+  pru_backport_save(pru, prods[["tab_notes"]], prod_df)
+  pru_backport_save(pru, prods[["tab_html"]], prod_df)
   proc_tab_html_to_cell_list(pru=pru, prod_df=prod_df)
   rai_write_all_tables_html(prod_df, "tables.html",out_dir = pru$ver_dir)
   rstudioapi::filesPaneNavigate(pru$ver_dir)

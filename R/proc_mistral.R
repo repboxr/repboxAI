@@ -41,7 +41,7 @@ proc_tab_mistral = function(project_dir, to_v0=TRUE) {
   tab_df$tabhtml = sapply(tab_df$cell_df, cell_df_to_simple_tabhtml)
   
   prod_id = "tab_html"
-  prod = get_repbox_prod(prod_id)
+  prod = repbox_prod(prod_id)
   fp_dir = project_dir_to_fp_dir(project_dir)
   proc_id = paste0("tab_html_mistral_ocr")
   proc_info = data.frame(prod_id=prod_id, proc_id = proc_id)
@@ -50,7 +50,7 @@ proc_tab_mistral = function(project_dir, to_v0=TRUE) {
   prod_df = df_to_prod_df(tab_df, prod)
   
   pru = pru_save(pru, prod_df)
-  pru_backport_save(pru, get_repbox_prod("tab_list"), prod_df)
+  pru_backport_save(pru, repbox_prod("tab_list"), prod_df)
   pru_cell = proc_tab_html_to_cell_list(pru=pru, prod_df=prod_df, also_cell_base=TRUE)
   rai_write_all_tables_html(prod_df, "tables.html",out_dir = pru$ver_dir)
   #rstudioapi::filesPaneNavigate(pru$ver_dir)

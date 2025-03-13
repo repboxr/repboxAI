@@ -14,7 +14,7 @@ example = function() {
 
 test_all_cell_base = function(project_dir, overwrite=FALSE) {
   tests = tests = define_tests_cell_base()
-  prod = get_repbox_prod("cell_base")
+  prod = repbox_prod("cell_base")
   fp_dir = project_dir_to_fp_dir(project_dir)
   ver_dirs = fp_all_ver_dirs(fp_dir, "cell_base")
   for (ver_dir in ver_dirs) {
@@ -23,7 +23,7 @@ test_all_cell_base = function(project_dir, overwrite=FALSE) {
   return(ver_dirs)
 }
 
-test_cell_base = function(ver_dir, prod_df=fp_load_prod_df(ver_dir=ver_dir), prod = get_repbox_prod("cell_base"), tests = define_tests_cell_base()) {
+test_cell_base = function(ver_dir, prod_df=fp_load_prod_df(ver_dir=ver_dir), prod = repbox_prod("cell_base"), tests = define_tests_cell_base()) {
   restore.point("test_cell_base")
   tests = define_tests_cell_base()
   test_df = prod_run_tests(tests,prod_df=prod_df, prod=prod, return_details = TRUE)

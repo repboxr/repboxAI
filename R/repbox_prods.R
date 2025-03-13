@@ -8,7 +8,7 @@ schema_html_tab = function(...) {
   x
 }
 
-get_repbox_prod = function(pid, prods = repbox_prods()) {
+repbox_prod = function(pid, prods = repbox_prods()) {
   prods[[pid]]
 }
 

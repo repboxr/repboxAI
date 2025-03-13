@@ -1,6 +1,8 @@
 # Rank tab versions and pick a standard
 
-
+example = function() {
+  project_dir = "~/repbox/projects_share/aejapp_1_2_4"
+}
 
 ev_tab = function(project_dir) {
   fp_dir = project_dir_to_fp_dir(project_dir)

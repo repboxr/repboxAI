@@ -34,7 +34,7 @@ proc_tab_html_pdf = function(project_dir, tpl_num=1,prods=repbox_prods(), ai_opt
   art_source = "pdf"
   tpl_file = file.path(rai_tpl_dir(), paste0(prod_id, "-", art_source, "-", tpl_num, ".txt"))
   
-  proc_info = rai_make_proc_info(prod_id=prod_id,ai_opts = ai_opts,tpl_file = tpl_file, json_mode=FALSE, use_schema = FALSE)
+  proc_info = rai_make_proc_info(prod_id=prod_id,ai_opts = ai_opts,tpl_file = tpl_file, json_mode=FALSE, use_schema = FALSE, raw=TRUE)
 
   fp_dir = project_dir_to_fp_dir(project_dir)
   pru = pru_init(fp_dir,prod_id,proc_info=proc_info,to_v0=to_v0)
@@ -60,7 +60,7 @@ pru_tab_html_pdf_run = function(pru) {
 
   df$raw_html = ai_combine_content_str(pru$items,err_val = NA_character_)
   df$tabhtml = sapply(df$raw_html,html_table_add_cellnum_row_col)
-  prod_df = df_to_prod_df(df, get_repbox_prod("tab_html"))
+  prod_df = df_to_prod_df(df, repbox_prod("tab_html"))
   pru_save(pru, prod_df)
   rai_write_all_tables_html(prod_df, "tables.html", out_dir=pru$ver_dir, info=pru$proc_info)
   
@@ -101,7 +101,7 @@ proc_tab_notes_pdf = function(project_dir, tpl_num=1,use_schema=FALSE, to_v0=TRU
   pru$rai = rai_run(pru$rai)
   pru = pru_set_status(pru, pru$rai)
   if (!pru_is_ok(pru)) return(invisible(pru))
-  prod = get_repbox_prod(prod_id)
+  prod = repbox_prod(prod_id)
   prod_df = df_to_prod_df(pru$rai$content, prod, prod_to_df_cols = pru$prod_to_df_cols)
   old_tabid = prod_df$tabid
   prod_df$tabid = tabid_normalize(prod_df$tabid)

@@ -1,7 +1,8 @@
 example = function() {
   prods = repbox_prods()
-  prod = repbox_readme_prods()[["readme_overview"]]
-  prod_to_json_schema(prod)
+  names(prods)
+  prod = repbox_readme_prods()[["readme_var"]]
+  prod_to_json_schema(prod, "arr")
 }
 
 repbox_prod = function(pid, prods = repbox_prods()) {
@@ -110,7 +111,29 @@ repbox_readme_prods = function() {
         data_year_end = schema_int("If the README provides information on the last year the data is from, state it. Otherwise return NA")
       ),
       keys = c("readme_file")
+    ),
+    prod_define(
+      "readme_var",
+      fields = list(
+        readme_file = schema_str("The name of the readme file."),
+        varname = schema_str("Name of the variable"),
+        vardescr = schema_str("Description or label of the variable as given in the readme file."),
+        dataset_files = schema_str("If the readme file mentions in which data set file(s) the variable occurs, list those data set file names as a comma separated string.")
+      ),
+      keys = c("readme_file")
+    ),
+    prod_define(
+      "readme_tabfig",
+      fields = list(
+        readme_file = schema_str("The name of the readme file."),
+        script_file = schema_str("Filename of the script"),
+        table_names = schema_str("Name of the table or tables that according to the README file are wholly or partially created by the script given in script_file. If the script creates multiple tables, write a comma separated list, e.g. 'Table 1, Table 3, Table A2.'"),
+        figure_names = schema_str("Name of the figure or figures that according to the README file are wholly or partially created by the script. If the script creates multiple figures, write a comma separated list, e.g. 'Figure 2, Figure 5'")
+      ),
+      keys = c("readme_file")
     )
+    
+    
   )  
 }
 

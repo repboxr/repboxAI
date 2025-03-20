@@ -10,14 +10,14 @@ example = function() {
   ai_clear_cache()
   repbox_run_fp(project_dir, steps,overwrite = TRUE)
   
-  repbox_error_ver_dirs(project_dirs, steps)
-  repbox_outage_ver_dirs(project_dirs, steps)
   
   repbox_rerun_outages(project_dir, steps)
   
   
   parent_dir = "~/repbox/projects_share"
   project_dirs = repboxExplore::get_project_dirs("~/repbox/projects_share")
+  repbox_error_ver_dirs(project_dirs, steps)
+  repbox_outage_ver_dirs(project_dirs, steps)
   for (project_dir in project_dirs) {
     cat("\n", project_dir, "\n")
     repbox_run_fp(project_dir,steps)

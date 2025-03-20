@@ -2,11 +2,16 @@
 
 example = function() {
   project_dir = "~/repbox/projects_share/aejapp_1_2_4"
+  project_dir = "~/repbox/projects_share/aeri_1_2_6"
+  doc_type = "art"
+  doc_type = "app1"
+  
+  rstudioapi::filesPaneNavigate(project_dir)
 }
 
-ev_tab = function(project_dir) {
-  fp_dir = project_dir_to_fp_dir(project_dir)
-  ev_dir = file.path(project_dir, "rai", "eval")
+repbox_ev_tab = function(project_dir, doc_type="art") {
+  fp_dir = project_dir_to_fp_dir(project_dir, doc_type)
+  ev_dir = file.path(project_dir, "fp", paste0("eval_", doc_type))
   if (!dir.exists(ev_dir)) dir.create(ev_dir)
   
   fp_all_ver_dirs(fp_dir, "cell_base")
@@ -27,7 +32,14 @@ ev_tab = function(project_dir) {
       summarize(ind = "set_deci", value =  paste0(bracket,num_str, collapse="|"))
   )
   id_df = bind_rows(id_li)    
-    
+
+  group_df = id_df %>%
+    group_by(tabid, ind, value) %>%
+    summarize(
+      group = list(ver_id),
+      group_size = n()
+    )
+  
   ev_df = id_df %>%
     group_by(tabid, ind) %>%
     summarize(

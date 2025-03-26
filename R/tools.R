@@ -1,6 +1,11 @@
 # Will probably be moved to repboxUtils
 # but keep them here during development cycle
 
+null_to_na = function(x, na_val = NA_character_) {
+  if (is.null(x)) return(na_val)
+  x
+}
+
 has_col = function(x, col) {
   col %in% names(x)
 }

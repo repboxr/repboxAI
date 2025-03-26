@@ -66,7 +66,7 @@ rai_has_input = function(doc_dir, ...) {
       inp = list(prod_id = inp)
     }
     if (is.list(inp)) {
-      ok = fp_has_input(fp_dir, inp$prod_id, inp$proc_id)
+      ok = fp_has_prod(fp_dir, inp$prod_id, inp$proc_id)
       if (!ok) {
         cat("\nRequired input ", inp$prod_id, " not found for ", doc_dir,"\n")
         return(FALSE)

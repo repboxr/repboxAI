@@ -46,7 +46,7 @@ proc_doc_tab_html_from_pdf = function(doc_dir, tpl_num=1,prods=repbox_prods(), a
   doc_form = "pdf"
   tpl_file = file.path(rai_tpl_dir(), paste0(prod_id, "-", doc_form, "-", tpl_num, ".txt"))
   
-  proc_info = rai_make_proc_info(prod_id=prod_id,ai_opts = ai_opts,tpl_file = tpl_file, json_mode=FALSE, use_schema = FALSE, raw=TRUE)
+  proc_info = rai_make_proc_info(prod_id=prod_id,ai_opts = ai_opts,tpl_file = tpl_file, json_mode=FALSE, use_schema = FALSE, raw=TRUE, proc_id_prefix = "pdf-")
 
   
   
@@ -59,11 +59,11 @@ proc_doc_tab_html_from_pdf = function(doc_dir, tpl_num=1,prods=repbox_prods(), a
   # 2. mocr
   proc_postfix = str.right.of(proc_info$proc_id,"-") %>% str.right.of("-")
   proc_ids = fp_all_proc_id(fp_dir, "tab_list")
-  input_pref = fp_input_pref(proc_id = c(
+  input_pref = fp_prod_ver_pref(proc_id = c(
     proc_ids[endsWith(proc_ids, proc_postfix)],
     proc_ids[endsWith(proc_ids, "_mocr")]  
   ))
-  pru = pru_pick_inputs(pru, "tab_list")
+  pru = pru_pick_inputs(pru, "tab_list", input_pref)
   if (pru_has_input_err(pru)) return(pru)
 
   context = rai_context(project_dir,doc_type_pdf = doc_type)
@@ -88,7 +88,7 @@ pru_tab_html_pdf_run = function(pru) {
   pru_save(pru, prod_df)
   rai_write_all_tables_html(prod_df, "tables.html", out_dir=pru$ver_dir, info=pru$proc_info)
   
-  proc_raw_tab_html_to_cell_base(pru, prod_df=prod_df)
+  proc_raw_tab_html_to_cell_base(pru, tab_df = prod_df)
   
   #rstudioapi::filesPaneNavigate(pru$ver_dir)
   
@@ -121,7 +121,7 @@ proc_doc_tab_notes_from_pdf = function(doc_dir, tpl_num=1,use_schema=FALSE, to_v
   art_source = "pdf"
   tpl_file = file.path(rai_tpl_dir(), paste0(prod_id, "-", art_source, "-", tpl_num, ".txt"))
 
-  proc_info = rai_make_proc_info(prod_id=prod_id,ai_opts = ai_opts,tpl_file = tpl_file, json_mode=TRUE, use_schema = use_schema)
+  proc_info = rai_make_proc_info(prod_id=prod_id,ai_opts = ai_opts,tpl_file = tpl_file, json_mode=TRUE, use_schema = use_schema,proc_id_prefix = "pdf-")
   
   fp_dir = doc_dir_to_fp_dir(doc_dir)
   project_dir = rai_fp_dir_to_project_dir(fp_dir)
@@ -140,6 +140,9 @@ proc_doc_tab_notes_from_pdf = function(doc_dir, tpl_num=1,use_schema=FALSE, to_v
   pru$rai = rai_init(project_dir, proc_info = proc_info, schema=schema, context=context)
   
   pru$rai = rai_run(pru$rai)
+  restore.point("proc_doc_tab_notes_from_pdf_post_run")
+  
+  
   pru = pru_set_status(pru, pru$rai)
   if (!pru_is_ok(pru)) return(invisible(pru))
   prod = repbox_prod(prod_id)

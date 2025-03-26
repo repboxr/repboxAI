@@ -42,7 +42,7 @@ proc_raw_tab_html_to_cell_base = function(org_pru=NULL, ver_dir=org_pru$ver_dir,
     org_pru = readRDS(file.path(ver_dir, "pru.Rds"))
   }
   prod_id = "cell_base"
-  proc_id = paste0(prod_id, str.right.of(org_pru$proc_id,"tab_html"))
+  proc_id = str.right.of(org_pru$proc_id,"raw_")
   pru = ddp_init_pru(org_pru, ver_dir=ver_dir,ddp_prod_id=prod_id, ddp_proc_id = proc_id)
   if (is.null(tab_df)) {
     tab_df = fp_load_prod_df(ver_dir=org_pru$ver_dir)

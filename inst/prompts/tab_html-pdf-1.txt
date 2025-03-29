@@ -6,6 +6,8 @@ Attached is a PDF of a scientific article. Please find Table {{tabid}} with the 
 
 Don't add any further remarks. Don't bother with css styling of the table. The extracted HTML table shall neither include the table notes nor the table title.
 
+IMPORTANT: Sometimes tables are continued on the next page. This is indicated at the end or beginning of the page and by the fact that we do not have a new table number. Combine the separate parts of a multi-page table to a single table.
+
 Important: Ensure that you copy the cell content, in particular, all numbers, correctly.
 
 Important: Try to have a column layout close to the the PDF version of the table. For example, if a column titlespans more than one column: add a corresponding colspan attribute to the td element. Separate numbers should always be in separate <td> cells. 

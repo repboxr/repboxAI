@@ -1,7 +1,7 @@
 example = function() {
   prods = repbox_prods()
   names(prods)
-  prod = repbox_readme_prods()[["readme_data"]]
+  prod = repbox_prod("tab_classify")
   prod_to_json_schema(prod, "arr")
 }
 
@@ -49,8 +49,9 @@ repbox_tab_prods = function() {
     ),
     prod_define("tab_classify",
       list(
-        tabid = schema_str("table id"),
-        panels = schema_str("Some tables exist of different panels shown above each other. If that is the case return a comma separated string with short panel IDs e.g. 'A,B,C' if it has a panel A, panel B and panel C."),
+        tabid = schema_str("The table id"),
+        tab_title = schema_str("The table title"),
+        panels = schema_str("Some tables exist of different panels shown above each other. If that is the case return a comma separated string with short panel IDs e.g. 'A,B,C' if it has a panel A, panel B and panel C. If no separate panels are marked just return null."),
         num_panels = schema_int("The number of explicit panels in the table. If the table does not distinguish panels, write 0."),
         shows_descriptive = schema_bool("true if the table shows descriptive statistics"),
         is_balancing_table = schema_bool("true if the table is a balancing table that shows whether certain characteristics are similarily distributed between control and treatment groups."),
@@ -60,8 +61,9 @@ repbox_tab_prods = function() {
         shows_iv_results =  schema_bool("true if results of an instrumental variable regression are shown in the table"),
         shows_iv_first_stage = schema_bool("true if results of a first stage instrumental variable regression are shown in the table."),
         shows_placebo_test = schema_bool("true if results of a placebo test are shown in the table"),
+        num_regression = schema_int("The results of how many separate regressions are shown in the table?"),
         uses_panel_data =  schema_bool("true if the data set underlying the table is a panel data set."),
-        short_descr =  schema_str("A short description of what is shown in the table.")
+        short_descr =  schema_str("A short description of what is shown in the table.", allow_null = FALSE)
       )
     ),
     prod_define(

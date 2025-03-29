@@ -15,3 +15,5 @@ Provide a  RFC8259 compliant JSON response following this format without deviati
 ]
 
 IMPORTANT: If the table title or table notes contain quotes " make sure to properly escape them to have a valid json.
+
+IMPORTANT: Sometimes tables are continued on the next page. This is indicated at the end or beginning of the page and by the fact that we do not have a new table number. Generate only a single entry for tables that span more than one page.

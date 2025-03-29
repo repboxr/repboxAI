@@ -1,37 +1,78 @@
-You are an assistant who carefully helps to classify the results shown in tables of a scientific articles. You don't invent any new text but only ensure to extract from the original text.
+You are an economic research assisstant that helps to extract information from scientific articles. You work very carefully.
 
-Below is the HTML version of the table {{_tables.tabtitle}} from the article. You also find the official table notes and excerpts from the articles that reference to the table.
+Attached is an {{doc_type_descr}}. We want to classify all tables shown in {{cur_doc}}. Here is a list of all those tables:
 
-Please classify the table according to the JSON schema below. Provide a  RFC8259 compliant JSON response following the format below without deviation:
+{{tablist}}
 
-[
+Given the information in the {{doc_type_descr}}, please classify those tables according to the JSON response schema below. 
+
+Important: If for some field, you don't know the answer given the provided information, please set the field value to null.
+
 {
-  "num_panels": "integer The number of explicit panels in the table, like Panel A and Panel B. If the table does not distinguish panels, write 0.",
-  "num_cols": "integer The total number of columns",
-  "num_rows": "integer The total number of rows",
-  "shows_descriptive": "boolean, true if the table shows descriptive statistics",
-  "is_balancing_table": "boolean, true if the table is a balancing table that shows whether certain characteristics are similarily distributed between control and treatment groups",
-  "shows_regression": "boolean, true if results of one or several regression are shown",
-  "shows_did": "boolean, true if results of a difference-in-difference regression are shown",
-  "shows_rdd": "boolean, true if results of regression discontinuity design are shown",
-  "shows_iv_results": "boolean, true if results of an instrumental variable regression are shown",
-  "shows_iv_first_stage": "boolean, true if results of a first stage instrumental variable regression are shown",
-  "shows_placebo_test": "boolean, true if results of a placebo test are shown",
-  "uses_panel_data": "boolean, is the data set underlying the table, a panel data set?"
-  "short_descr": "A short description of what is shown in the table"
-}
-]
-
-If for a boolean variable you don't know whether it is true or false, please write "NA" for the field value.
-
-THE TABLE
-
-{{_tables.tabtitle}}
-{{_tables.tabhtml}}
-{{_tables.tabnotes}}
-
-PARTS OF ARTICLE THAT REFERENCE TO THE TABLE
-
-{{_tables.ref_text}}
-
-
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "tabid": {
+        "type": ["string"],
+        "description": "tabid is the table ID as shown in the table list above."
+      },
+      "tab_title": {
+        "type": ["string"],
+        "description": "The table title"
+      },
+      "panels": {
+        "type": ["string", "null"],
+        "description": "Some tables exist of different panels shown above each other. If that is the case return a comma separated string with short panel IDs e.g. 'A,B,C' if it has a panel A, panel B and panel C. If no separate panels are marked just return null."
+      },
+      "num_panels": {
+        "type": ["integer", "null"],
+        "description": "The number of explicit panels in the table. If the table does not distinguish panels, write 0."
+      },
+      "shows_descriptive": {
+        "type": ["bool", "null"],
+        "description": "true if the table shows descriptive statistics"
+      },
+      "is_balancing_table": {
+        "type": ["bool", "null"],
+        "description": "true if the table is a balancing table that shows whether certain characteristics are similarily distributed between control and treatment groups."
+      },
+      "shows_regression": {
+        "type": ["bool", "null"],
+        "description": "true if results of one or several regressions are shown in the table."
+      },
+      "shows_did": {
+        "type": ["bool", "null"],
+        "description": "true if results of a difference-in-difference regression are shown in the table."
+      },
+      "shows_rdd": {
+        "type": ["bool", "null"],
+        "description": "true if results of regression discontinuity design are shown in the table."
+      },
+      "shows_iv_results": {
+        "type": ["bool", "null"],
+        "description": "true if results of an instrumental variable regression are shown in the table"
+      },
+      "shows_iv_first_stage": {
+        "type": ["bool", "null"],
+        "description": "true if results of a first stage instrumental variable regression are shown in the table."
+      },
+      "shows_placebo_test": {
+        "type": ["bool", "null"],
+        "description": "true if results of a placebo test are shown in the table"
+      },
+      "num_regression": {
+        "type": ["integer", "null"],
+        "description": "The results of how many separate regressions are shown in the table?"
+      },
+      "uses_panel_data": {
+        "type": ["bool", "null"],
+        "description": "true if the data set underlying the table is a panel data set."
+      },
+      "short_descr": {
+        "type": "string",
+        "description": "A short description of what is shown in the table."
+      }
+    }
+  }
+} 

@@ -6,8 +6,9 @@ example = function() {
   rgemini::set_gemini_api_key(file = "~/repbox/gemini/gemini_api_key.txt")
   set_ai_opts(model = "gemini-2.0-flash-thinking-exp")
   set_ai_opts(model = "gemini-2.0-flash")
+  project_dir = "/home/rstudio/repbox/projects_share/ecta_84_2_6" 
+  #steps = repbox_fp_steps_from(tab_given = TRUE, tab_notes_pdf = FALSE, tab_html_pdf = FALSE, tab_main = TRUE, readme = FALSE)
   steps = repbox_fp_steps_from(tab_given = TRUE,readme = FALSE)
-  project_dir = project_dirs =  "/home/rstudio/repbox/projects_share/aejapp_1_2_4"
   repbox_run_fp(project_dir, steps,overwrite = TRUE)
   rstudioapi::filesPaneNavigate(project_dir)
   
@@ -17,11 +18,12 @@ example = function() {
   library(repboxAI)
   library(aikit)
   rgemini::set_gemini_api_key(file = "~/repbox/gemini/gemini_api_key.txt")
-  set_ai_opts(model = "gemini-2.0-flash")
   set_ai_opts(model = "gemini-2.0-flash-thinking-exp")
+  set_ai_opts(model = "gemini-2.0-flash")
   parent_dir = "~/repbox/projects_share"
   steps = repbox_fp_steps(readme_data = TRUE)
   steps = repbox_fp_steps_from(tab_given = TRUE,readme = FALSE)
+  steps = repbox_fp_steps(tab_main=TRUE)
   project_dirs = repboxExplore::get_project_dirs("~/repbox/projects_share")
   repbox_error_ver_dirs(project_dirs, steps)
   repbox_outage_ver_dirs(project_dirs, steps)
@@ -89,22 +91,6 @@ repbox_run_fp = function(project_dir, steps = repbox_fp_steps_from(TRUE), overwr
 
 }
 
-repbox_outage_ver_dirs = function(project_dirs, steps = repbox_fp_steps_from(TRUE)) {
-  restore.point("repbox_outage_ver_dirs")
-  parent_dirs = file.path(project_dirs, "fp") 
-  ver_dirs = NULL
-  if (steps$tab_notes_pdf) {
-    ver_dirs = union(ver_dirs, fp_all_outage_ver_dirs(parent_dirs, "tab_notes"))
-  }
-  if (steps$tab_html_pdf) {
-    ver_dirs = union(ver_dirs, fp_all_outage_ver_dirs(parent_dirs, "tab_html"))
-  }
-  if (steps$readme) {
-    ver_dirs = union(ver_dirs, fp_all_outage_ver_dirs(parent_dirs,c( "readme_overview","readme_var", "readme_script_tab_fig","readme_data","readme_data_descr")))
-  }
-  ver_dirs
-}  
-
 repbox_error_ver_dirs = function(project_dirs, steps = repbox_fp_steps_from(TRUE)) {
   restore.point("repbox_error_ver_dirs")
   parent_dirs = file.path(project_dirs, "fp") 
@@ -120,6 +106,23 @@ repbox_error_ver_dirs = function(project_dirs, steps = repbox_fp_steps_from(TRUE
   }
   ver_dirs
 } 
+
+
+repbox_outage_ver_dirs = function(project_dirs, steps = repbox_fp_steps_from(TRUE)) {
+  restore.point("repbox_outage_ver_dirs")
+  parent_dirs = file.path(project_dirs, "fp") 
+  ver_dirs = NULL
+  if (steps$tab_notes_pdf) {
+    ver_dirs = union(ver_dirs, fp_all_outage_ver_dirs(parent_dirs, "tab_notes"))
+  }
+  if (steps$tab_html_pdf) {
+    ver_dirs = union(ver_dirs, fp_all_outage_ver_dirs(parent_dirs, "tab_html"))
+  }
+  if (steps$readme) {
+    ver_dirs = union(ver_dirs, fp_all_outage_ver_dirs(parent_dirs,c( "readme_overview","readme_var", "readme_script_tab_fig","readme_data","readme_data_descr")))
+  }
+  ver_dirs
+}  
 
 repbox_rerun_outages = function(project_dirs, steps = repbox_fp_steps_from(TRUE), max_repeat=0, sleep_sec = 30) {
   restore.point("repbox_rerun_outages")

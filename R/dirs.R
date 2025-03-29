@@ -1,4 +1,12 @@
 
+rai_doc_file = function(project_dir, doc_type = "art", doc_pref=c("html","pdf", "md", "txt")) {
+  
+}
+rai_fp_dir = function(project_dir, doc_type) {
+  paste0(project_dir, "/fp/prod_", doc_type)
+}
+
+
 rai_fp_dirs = function(project_dir) {
   dir(file.path(project_dir, "fp"), pattern=glob2rx("prod_*"), recursive = FALSE, full.names=TRUE)
 }

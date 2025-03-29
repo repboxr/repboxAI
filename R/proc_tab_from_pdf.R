@@ -59,7 +59,7 @@ proc_doc_tab_html_from_pdf = function(doc_dir, tpl_num=1,prods=repbox_prods(), a
   # 2. mocr
   proc_postfix = str.right.of(proc_info$proc_id,"-") %>% str.right.of("-")
   proc_ids = fp_all_proc_id(fp_dir, "tab_list")
-  input_pref = fp_prod_ver_pref(proc_id = c(
+  input_pref = fp_pref(proc_id = c(
     proc_ids[endsWith(proc_ids, proc_postfix)],
     proc_ids[endsWith(proc_ids, "_mocr")]  
   ))
@@ -147,6 +147,21 @@ proc_doc_tab_notes_from_pdf = function(doc_dir, tpl_num=1,use_schema=FALSE, to_v
   if (!pru_is_ok(pru)) return(invisible(pru))
   prod = repbox_prod(prod_id)
   prod_df = df_to_prod_df(pru$rai$content, prod, prod_to_df_cols = pru$prod_to_df_cols)
+  # Deal with continued tables
+  prod_df = prod_df %>%
+    mutate(
+      merge_above = 
+      is.true(lag(tabid)==tabid) |
+      (is.true(has.substr(tabtitle, "ontinue") & is.na(tabid)))
+    )
+  rows = which(prod_df$merge_above)
+  for (r in rows) {
+    if (r==1) next
+    prod_df$tabnotes[r-1] = paste0(prod_df$tabnotes[r-1],"\n",prod_df$tabnotes[r])
+  }    
+  prod_df = prod_df[!is.na(prod_df$tabid)&!prod_df$merge_above,]
+  prod_df = prod_df[, setdiff(colnames(prod_df),"merge_above")]
+  
   old_tabid = prod_df$tabid
   prod_df$tabid = tabid_normalize(prod_df$tabid)
   if (!all(old_tabid==prod_df$tabid)) {

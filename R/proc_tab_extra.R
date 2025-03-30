@@ -9,6 +9,38 @@ example = function() {
   proc_by_tab_extra(project_dir, "tab_classify", add_doc=FALSE, add_tab_main = TRUE, add_tab_ref=TRUE, doc_type="art")
   proc_tab_extra(project_dir, "tab_classify", doc_type="art")
   rstudioapi::filesPaneNavigate(pru$ver_dir)
+  
+  
+  
+  project_dirs = repboxExplore::get_project_dirs("~/repbox/projects_share")
+  library(repboxAI)
+  rgemini::set_gemini_api_key(file = "~/repbox/gemini/gemini_api_key.txt")
+  set_ai_opts(model = "gemini-2.0-flash")
+  overwrite = FALSE
+  
+  i = 2; inds = 2; doc_type = "art"
+  inds = seq_along(project_dirs)
+  for (i in inds) {
+    
+    project_dir = project_dirs[i]
+    doc_types = repbox_doc_types(project_dir)
+
+    for (doc_type in doc_types) {
+      cat("\n****************\n",i," ", project_dir, "\n  ", doc_type, "\n****************\n")
+      cat('\n proc_tab_extra(project_dir, "tab_classify", doc_type="art")\n')
+      proc_tab_extra(project_dir, "tab_classify", doc_type=doc_type, overwrite = overwrite)
+      cat('\n proc_by_tab_extra(project_dir, "tab_classify", add_doc=TRUE, add_tab_main = TRUE, add_tab_ref=TRUE, doc_type="art")\n')
+      proc_by_tab_extra(project_dir, "tab_classify", add_doc=TRUE, add_tab_main = TRUE, add_tab_ref=TRUE, doc_type=doc_type, overwrite = overwrite)
+      
+      cat('\n proc_by_tab_extra(project_dir, "tab_classify", add_doc=FALSE, add_tab_main = TRUE, add_tab_ref=TRUE, doc_type="art")\n')
+      proc_by_tab_extra(project_dir, "tab_classify", add_doc=FALSE, add_tab_main = TRUE, add_tab_ref=TRUE, doc_type=doc_type, overwrite = overwrite)
+    }    
+    
+  }
+  
+  rstudioapi::filesPaneNavigate(project_dir)
+  
+  
 }
 
 
@@ -104,11 +136,14 @@ proc_by_tab_extra_run = function(pru) {
   })
   pru = pru_set_status(pru, pru$items)
   restore.point("post_pru_by_tab_extra_run")
+  
+  temp_pru_save(pru); #pru = temp_pru
+  
   if (!pru_is_ok(pru)) return(invisible(pru))
   
+  
   prod = repbox_prod(pru$prod_id)
-  rclasses = prod_to_rclasses(prod)
-  res_df = ai_combine_content_df(pru$items, df %>% select(tabid),rclasses = rclasses)
+  res_df = ai_combine_content_df(pru$items, df %>% select(tabid),schema = prod_to_schema(prod,"obj"))
   prod_df = df_to_prod_df(res_df, repbox_prod(pru$prod_id))
   pru_save(pru, prod_df)
   return(invisible(pru))
@@ -134,13 +169,11 @@ proc_tab_extra = function(project_dir, prod_id = c("tab_classify")[1], doc_type=
 
   
   if (!overwrite) if (fp_ver_dir_ok(pru$ver_dir)) return(NULL)
-  if (add_doc) {
-    # We add always all documents: article and possible appendices
-    pru$doc_files = rai_doc_file(project_dir,doc_type = NULL,pref = doc_file_form_pref)
-    pru$context = rai_context(project_dir,model = ai_opts$model,media_files = pru$doc_files)
-  } else {
-    pru$context = NULL
-  }
+  
+  # We add always all documents: article and possible appendices
+  pru$doc_files = rai_doc_file(project_dir,doc_type = NULL,pref = doc_file_form_pref)
+  pru$context = rai_context(project_dir,model = ai_opts$model,media_files = pru$doc_files)
+  
   pru_next_stage(pru, "proc_tab_extra_run")
 }
 
@@ -176,11 +209,14 @@ proc_tab_extra_run = function(pru) {
   pru = pru_set_status(pru, pru$items)
   
   restore.point("post_pru_tab_extra_run")
+  temp_pru_save(pru); #pru = temp_pru
+  
+  
   if (!pru_is_ok(pru)) return(invisible(pru))
   
   prod = repbox_prod(pru$prod_id)
-  rclasses = prod_to_rclasses(prod)
-  res_df = ai_combine_content_df(pru$items, df %>% select(tabid),rclasses = rclasses)
+  schema = prod_to_schema(prod, "obj")
+  res_df = ai_combine_content_df(pru$items, df %>% select(tabid),schema=schema)
   prod_df = df_to_prod_df(res_df, repbox_prod(pru$prod_id))
   pru_save(pru, prod_df)
   return(invisible(pru))

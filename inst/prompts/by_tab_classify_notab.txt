@@ -4,8 +4,13 @@ Attached is an {{doc_type_descr}}
 
 We are interested in classifying the table titled {{tabtitle}}. Given the information in the {{doc_type_descr}}, please classify the table according to the JSON response schema below. 
 
+Format the output as a single JSON object containing *only* the fields listed under the `properties` key in the schema below. 
+
+**Crucially, do NOT include the top-level `type` or `properties` keys from the schema definition in your final output.** Your response should start directly with `{ "tab_title": ... }`.
+
 Important: If for some field, you don't know the answer given the provided information, please set the field value to null.
 
+JSON RESPONSE SCHEMA:
 {
   "type": "object",
   "properties": {

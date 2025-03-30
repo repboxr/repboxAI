@@ -67,7 +67,8 @@ pru_readme_run = function(pru) {
   restore.point("pru_readme_run")
   if (!pru_is_ok(pru)) return(invisible(pru))
   
-  res_df = ai_combine_content_df(pru$items, df %>% select(readme_file = org_file))
+  prod = repbox_prod(pru$prod_id)
+  res_df = ai_combine_content_df(pru$items, df %>% select(readme_file = org_file),schema = prod_to_schema(prod, "arr"))
   prod_df = df_to_prod_df(res_df, repbox_prod(pru$prod_id))
   pru_save(pru, prod_df)
   return(invisible(pru))

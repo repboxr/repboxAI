@@ -34,7 +34,19 @@ example = function() {
   
   repbox_rerun_outages(project_dirs,steps = steps,max_repeat = 5, sleep_sec = 30)
 
+
+  library(repboxAI)
+  library(aikit)
+  rgemini::set_gemini_api_key(file = "~/repbox/gemini/gemini_api_key.txt")
+  set_ai_opts(model = "gemini-2.0-flash-thinking-exp")
+  set_ai_opts(model = "gemini-2.0-flash")
+  parent_dir = "~/repbox/projects_share"
+  project_dirs = repboxExplore::get_project_dirs("~/repbox/projects_share")
   
+  steps = repbox_fp_steps_from(tab_classify = TRUE)
+  repbox_rerun_outages(project_dirs,max_repeat = 5, sleep_sec = 30)
+  
+    
   repbox_run_fp(project_dir,steps)
   rstudioapi::filesPaneNavigate(project_dir)
   
@@ -42,12 +54,12 @@ example = function() {
   
 }
 
-repbox_fp_steps = function(tab_given=FALSE, tab_notes_pdf=FALSE, tab_html_pdf=FALSE, tab_main=FALSE, ev_tab=FALSE, readme=FALSE, readme_overview=readme, readme_var=readme, readme_script_tab_fig = readme, readme_data=readme) {
+repbox_fp_steps = function(tab_given=FALSE, tab_notes_pdf=FALSE, tab_html_pdf=FALSE, tab_main=FALSE, ev_tab=FALSE, readme=FALSE, readme_overview=readme, readme_var=readme, readme_script_tab_fig = readme, readme_data=readme, tab_classify = FALSE, by_tab_classify = FALSE, by_tab_classify_nodoc=FALSE) {
   as.list(sys.frame(sys.parent(0)))
 }
 
 
-repbox_fp_steps_from = function(tab_given=FALSE, tab_notes_pdf=tab_given, tab_html_pdf=tab_notes_pdf, tab_main=tab_html_pdf, ev_tab=tab_main, readme=ev_tab, readme_overview=readme, readme_var=readme, readme_script_tab_fig = readme, readme_data=readme) {
+repbox_fp_steps_from = function(tab_given=FALSE, tab_notes_pdf=tab_given, tab_html_pdf=tab_notes_pdf, tab_main=tab_html_pdf, ev_tab=tab_main, readme=ev_tab, readme_overview=readme, readme_var=readme, readme_script_tab_fig = readme, readme_data=readme, tab_classify = readme_data, by_tab_classify = tab_classify, by_tab_classify_nodoc=by_tab_classify) {
   as.list(sys.frame(sys.parent(0)))
 }
 
@@ -89,6 +101,22 @@ repbox_run_fp = function(project_dir, steps = repbox_fp_steps_from(TRUE), overwr
     proc_readme(project_dir,"readme_data", overwrite=overwrite)
   }
 
+  if (steps$tab_classify) {
+    for (dt in doc_type) {
+      proc_tab_extra(project_dir, "tab_classify", doc_type="art")
+    }
+  }
+  if (steps$by_tab_classify) {
+    for (dt in doc_type) {
+      proc_by_tab_extra(project_dir, "tab_classify", add_doc=TRUE, add_tab_main = TRUE, add_tab_ref=TRUE, doc_type=dt)
+    }
+  }
+  if (steps$by_tab_classify_nodoc) {
+    for (dt in doc_type) {
+      proc_by_tab_extra(project_dir, "tab_classify", add_doc=FALSE, add_tab_main = TRUE, add_tab_ref=TRUE, doc_type=dt)
+    }
+  }
+  
 }
 
 repbox_error_ver_dirs = function(project_dirs, steps = repbox_fp_steps_from(TRUE)) {
@@ -120,6 +148,9 @@ repbox_outage_ver_dirs = function(project_dirs, steps = repbox_fp_steps_from(TRU
   }
   if (steps$readme) {
     ver_dirs = union(ver_dirs, fp_all_outage_ver_dirs(parent_dirs,c( "readme_overview","readme_var", "readme_script_tab_fig","readme_data","readme_data_descr")))
+  }
+  if (steps$tab_classify | steps$by_tab_classify | steps$by_tab_classify_nodoc) {
+    ver_dirs = union(ver_dirs, fp_all_outage_ver_dirs(parent_dirs, "tab_classify"))
   }
   ver_dirs
 }  

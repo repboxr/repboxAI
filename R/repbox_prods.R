@@ -1,8 +1,8 @@
 example = function() {
   prods = repbox_prods()
   names(prods)
-  prod = repbox_prod("tab_classify")
-  prod_to_json_schema(prod, "arr")
+  prod = repbox_prod("map_reg_static")
+  prod_to_json_schema(prod, "arr",allow_null_def = FALSE)
 }
 
 repbox_prod = function(pid, prods = repbox_prods()) {
@@ -12,7 +12,8 @@ repbox_prod = function(pid, prods = repbox_prods()) {
 repbox_prods = function() {
   c(
     repbox_tab_prods(),
-    repbox_readme_prods()
+    repbox_readme_prods(),
+    repbox_map_prods()
   )
 }
 
@@ -199,7 +200,7 @@ repbox_readme_prods = function() {
 }
 
 
-repbox_tab_reg_prods = function() {
+repbox_map_prods = function() {
   prods_define(
     prod_define("tab_reg_comma",
       list(
@@ -208,6 +209,15 @@ repbox_tab_reg_prods = function() {
         reg_cell_ids = schema_str("A comma separated list of all cell ids ")
       )
     ),
+    prod_define("map_reg_static",
+      list(
+        tabid = schema_str("The table ID as stated in the list of tables above."),
+        reg_ind = schema_int("A counter that provides a uniqe integer number for each regression that you have identified across all tables. Start with 1 and increment for each regression."),
+        do_file = schema_str("The name of the do file, as listed in the list of do files above. I.e. include file paths if they are stated in the list above."),
+        code_line = schema_int("The code line of the regression command in the do file, corresponding to the particular regression shown in the table. If the command extends over more than one line, write down the first line. If certain cells"),
+        cell_ids = schema_str("A comma separated list of all cell ids of those cells in the HTML version of the table that correspond to this specific regression and whose value was computed by the specified code line. Each cell id can be found as the 'id' tag of the corresponding <td> or <th> element of the HTML version of the article's table. Only add cells that show numeric results, e.g. estimated coefficient, or number of observations, but no title cells or cells showing variable labels. Some tables in articles are structured such that some descriptive statistics, like the number of observations are shown on the bottom of a column and apply to multiple regressions shown in that column. Add the corresponding cell id for every regression, that they apply to.")
+      )
+    )
   )
 }
 

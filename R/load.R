@@ -16,7 +16,23 @@ rai_pick_tab_ver = function(fp_dir, prod_id = "tab_html", pref=NULL, proc_id=NUL
   fp_pick_prod_ver(fp_dir, prod_id=prod_id,proc_id=proc_id, pref=pref)
 }
 
+# Shorten file paths if files are unique
+# to reduce length of output tokens
+script_df_shorten_file = function(script_df) {
+  if (!anyDuplicated(script_df$file_path)) {
+    script_df$file = basename(script_df$file_path)
+  } else {
+    script_df$file = script_df$file_path
+  }
+  script_df
+}
 
+rai_load_do_source = function(project_dir) {
+  parcels = repdb_load_parcels(project_dir, "stata_source")
+  script_df = parcels$stata_source$script_source
+  script_df = script_df_shorten_file((script_df))
+  script_df
+}
 
 rai_load_tab_prod_df = function(fp_dir, prod_id = "tab_html", pref=NULL, proc_id=NULL, cache=NULL) {
   restore.point("rai_load_tab_prod_df")
@@ -57,38 +73,4 @@ tab_ref_default_pref = function() {
 
 rai_doc_file = function(project_dir, doc_type, pref = doc_file_form_default_pref(), doc_form=NULL) {
   repbox_doc_file_select(project_dir, doc_type = doc_type, doc_file_form_pref = pref, doc_form=doc_form)$doc_file
-}
-
-rai_make_tab_prompt_html = function(project_dir, tabid, tab_main, all_ref_li=NULL, all_part_df = NULL, outfile=NULL, doc_type="art") {
-  restore.point("rai_make_tab_prompt_html")
-  fp_dir = rai_fp_dir(project_dir, doc_type)
-
-  tab_main = tab_df = tab_main[tab_main$tabid == tabid,]
-  title_col = "tabtitle"; notes_col = "tabnots"
-  tabtitles =   
-  tab_html = paste0(paste0("<h2>",tab_df$tabtitle, "</h2>", tab_df$tabhtml, "<p>", na_val(tab_df$tabnotes,""),"</p>"))
-
-  ref_txt = NULL
-  if (!is.null(all_ref_li)) {
-    ref_txt = sapply(seq_along(all_ref_li), function(i) {
-      paste0(repboxDoc::rdoc_tab_ref_text(tabid = tabid, ref_li = all_ref_li[[i]],part_df = all_part_df[[i]],sep_str = "<p>[...]</p>")$text, collapse="\n")
-    })
-    ref_txt = ref_txt[nchar(ref_txt)>0]
-    ref_txt = paste0(ref_txt, collapse = "<p>[...]</p>")
-  }
-  if (length(ref_txt)>0) {
-    ref_html = paste0("<p>", ref_txt, "</p>")
-    html = paste0(tab_html, "\n<h2>Parts in the text that reference to the table </h2>", ref_html)
-  } else {
-    html = tab_html
-  }
-  html = paste0(html, collapse="\n")
-  
-  if (!is.null(outfile)) {
-    outdir = dirname(outfile)
-    if (!dir.exists(outdir)) dir.create(outdir,recursive = TRUE)
-    writeUtf8(html, outfile)
-    
-  }
-  invisible(html)
 }

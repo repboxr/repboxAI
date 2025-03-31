@@ -20,13 +20,12 @@ example = function() {
   rgemini::set_gemini_api_key(file = "~/repbox/gemini/gemini_api_key.txt")
   set_ai_opts(model = "gemini-2.0-flash-thinking-exp")
   set_ai_opts(model = "gemini-2.0-flash")
+  set_ai_opts(model = "gemini-2.5-pro-exp-03-25")
+  
   parent_dir = "~/repbox/projects_share"
-  steps = repbox_fp_steps(readme_data = TRUE)
-  steps = repbox_fp_steps_from(tab_given = TRUE,readme = FALSE)
-  steps = repbox_fp_steps(tab_main=TRUE)
+  steps = repbox_fp_steps(map_reg_static = TRUE)
   project_dirs = repboxExplore::get_project_dirs("~/repbox/projects_share")
-  repbox_error_ver_dirs(project_dirs, steps)
-  repbox_outage_ver_dirs(project_dirs, steps)
+  project_dir = project_dirs[2]
   for (project_dir in project_dirs) {
     cat("\n", project_dir, "\n")
     repbox_run_fp(project_dir,steps, overwrite = FALSE)
@@ -34,16 +33,19 @@ example = function() {
   
   repbox_rerun_outages(project_dirs,steps = steps,max_repeat = 5, sleep_sec = 30)
 
+  
+  repbox_error_ver_dirs(project_dirs, steps)
+  repbox_outage_ver_dirs(project_dirs, steps)
+  
 
   library(repboxAI)
   library(aikit)
   rgemini::set_gemini_api_key(file = "~/repbox/gemini/gemini_api_key.txt")
   set_ai_opts(model = "gemini-2.0-flash-thinking-exp")
   set_ai_opts(model = "gemini-2.0-flash")
+  set_ai_opts(model = "gemini-2.5-pro-exp-03-25")
   parent_dir = "~/repbox/projects_share"
   project_dirs = repboxExplore::get_project_dirs("~/repbox/projects_share")
-  
-  steps = repbox_fp_steps_from(tab_classify = TRUE)
   repbox_rerun_outages(project_dirs,max_repeat = 5, sleep_sec = 30)
   
     
@@ -54,12 +56,12 @@ example = function() {
   
 }
 
-repbox_fp_steps = function(tab_given=FALSE, tab_notes_pdf=FALSE, tab_html_pdf=FALSE, tab_main=FALSE, ev_tab=FALSE, readme=FALSE, readme_overview=readme, readme_var=readme, readme_script_tab_fig = readme, readme_data=readme, tab_classify = FALSE, by_tab_classify = FALSE, by_tab_classify_nodoc=FALSE) {
+repbox_fp_steps = function(tab_given=FALSE, tab_notes_pdf=FALSE, tab_html_pdf=FALSE, tab_main=FALSE, ev_tab=FALSE, readme=FALSE, readme_overview=readme, readme_var=readme, readme_script_tab_fig = readme, readme_data=readme, tab_classify = FALSE, by_tab_classify = FALSE, by_tab_classify_nodoc=FALSE, map_reg_static = FALSE) {
   as.list(sys.frame(sys.parent(0)))
 }
 
 
-repbox_fp_steps_from = function(tab_given=FALSE, tab_notes_pdf=tab_given, tab_html_pdf=tab_notes_pdf, tab_main=tab_html_pdf, ev_tab=tab_main, readme=ev_tab, readme_overview=readme, readme_var=readme, readme_script_tab_fig = readme, readme_data=readme, tab_classify = readme_data, by_tab_classify = tab_classify, by_tab_classify_nodoc=by_tab_classify) {
+repbox_fp_steps_from = function(tab_given=FALSE, tab_notes_pdf=tab_given, tab_html_pdf=tab_notes_pdf, tab_main=tab_html_pdf, ev_tab=tab_main, readme=ev_tab, readme_overview=readme, readme_var=readme, readme_script_tab_fig = readme, readme_data=readme, tab_classify = readme_data, by_tab_classify = tab_classify, by_tab_classify_nodoc=by_tab_classify, map_reg_static = by_tab_classify_nodoc) {
   as.list(sys.frame(sys.parent(0)))
 }
 
@@ -68,6 +70,8 @@ repbox_run_fp = function(project_dir, steps = repbox_fp_steps_from(TRUE), overwr
   all_doc_types = repbox_doc_types(project_dir)
   if (!is.null(doc_type)) {
     doc_type = intersect(doc_type, all_doc_types)
+  } else {
+    doc_type = all_doc_types
   }
   if (steps$tab_given) {
     proc_tab_given(project_dir, doc_type=doc_type)
@@ -103,17 +107,22 @@ repbox_run_fp = function(project_dir, steps = repbox_fp_steps_from(TRUE), overwr
 
   if (steps$tab_classify) {
     for (dt in doc_type) {
-      proc_tab_extra(project_dir, "tab_classify", doc_type="art")
+      proc_tab_extra(project_dir, "tab_classify", doc_type="art",overwrite = overwrite)
     }
   }
   if (steps$by_tab_classify) {
     for (dt in doc_type) {
-      proc_by_tab_extra(project_dir, "tab_classify", add_doc=TRUE, add_tab_main = TRUE, add_tab_ref=TRUE, doc_type=dt)
+      proc_by_tab_extra(project_dir, "tab_classify", add_doc=TRUE, add_tab_main = TRUE, add_tab_ref=TRUE, doc_type=dt,overwrite = overwrite)
     }
   }
   if (steps$by_tab_classify_nodoc) {
     for (dt in doc_type) {
-      proc_by_tab_extra(project_dir, "tab_classify", add_doc=FALSE, add_tab_main = TRUE, add_tab_ref=TRUE, doc_type=dt)
+      proc_by_tab_extra(project_dir, "tab_classify", add_doc=FALSE, add_tab_main = TRUE, add_tab_ref=TRUE, doc_type=dt,overwrite = overwrite)
+    }
+  }
+  if (steps$map_reg_static) {
+    for (dt in doc_type) {
+      proc_single(project_dir,doc_type=dt, "map_reg_static", add_all_doc = TRUE, add_all_tab = TRUE,add_all_static_do = TRUE,overwrite = overwrite)
     }
   }
   
@@ -161,13 +170,14 @@ repbox_rerun_outages = function(project_dirs, steps = repbox_fp_steps_from(TRUE)
   cat(paste0("\n", length(ver_dirs), " outages found.\n\n"))
   if (length(ver_dirs)==0) return(NULL)
   
+  rem_ver_dirs = ver_dirs
   counter = 0
   while(counter <= max_repeat) {
     counter = counter+1
-    fp_rerun_all_outage_ver(ver_dirs=ver_dirs)
+    fp_rerun_all_outage_ver(ver_dirs=rem_ver_dirs)
     rem_ver_dirs = repbox_outage_ver_dirs(project_dirs, steps)
     if (length(rem_ver_dirs)==0 | counter > max_repeat) break
-    cat(paste0("\n\n", length(ver_dirs)==0, " remaining outages.\nSleep for ", sleep_sec, " sec...\n"))
+    cat(paste0("\n\n", length(rem_ver_dirs), " remaining outages.\nSleep for ", sleep_sec, " sec...\n"))
     Sys.sleep(sleep_sec)
   }
   invisible(ver_dirs)

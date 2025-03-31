@@ -5,14 +5,7 @@ rai_tpl_dir = function() {
 
 
 rai_model_short = function(model) {
-  case_when(
-    model == "gemini-2.0-flash" ~ "g2f",
-    model == "gemini-1.5-flash-001" ~ "g15f",
-    model == "gemini-2.0-flash-lite-preview-02-05" ~ "g2flp",
-    model == "gemini-2.0-flash-lite" ~ "g2fl",
-    model == "gemini-2.0-flash-thinking-exp" ~ "g2fte",
-    TRUE ~ model    
-  )
+  ai_model_short(model)
 }
 
 rai_init = function(project_dir,json_mode=first_nn(proc_info$json_mode,FALSE), schema=NULL, values = NULL, context=NULL, media_files=NULL, tpl=NULL, tpl_file = proc_info$tpl_file,   model=ai_opts$model, temperature=ai_opts$temperature, proc_info=NULL, ai_opts=get_ai_opts() ) {

@@ -8,6 +8,8 @@ Given the information in the {{doc_type_descr}}, please classify those tables ac
 
 Important: If for some field, you don't know the answer given the provided information, please set the field value to null.
 
+JSON RESPONSE SCHEMA:
+
 {
   "type": "array",
   "items": {

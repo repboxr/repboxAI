@@ -67,9 +67,10 @@ proc_by_tab_extra = function(project_dir, prod_id = c("tab_classify")[1], doc_ty
   
   pru = pru_init(fp_dir,prod_id,proc_info=proc_info,to_v0=to_v0, ai_opts=ai_opts, tab_main_pref=tab_main_pref, tab_ref_pref=tab_ref_pref, add_tab_main=add_tab_main, add_tab_ref=add_tab_ref, project_dir=project_dir, doc_type=doc_type)
   
+  pru = rai_pick_tab_main(project_dir,doc_type,tab_main_pref)
+  #pru$tab_main_info = fp_pick_prod_ver(fp_dir, "tab_main", pref=tab_main_pref)
+  #pru$tab_main = fp_load_prod_df(pru$tab_main_info$ver_dir)
   
-  pru$tab_main_info = fp_pick_prod_ver(fp_dir, "tab_main", pref=tab_main_pref)
-  pru$tab_main = fp_load_prod_df(pru$tab_main_info$ver_dir)
   # references will be loaded for all documents
   pru$doc_types = doc_types = repbox_doc_types(project_dir)
   if (add_tab_ref) {
@@ -123,7 +124,7 @@ proc_by_tab_extra_run = function(pru) {
     tabid = df$tabid[[row]]
     if (pru$add_tab_main) {
       tab_html_file = file.path(project_dir,"fp","prompt_files",paste0(tab_html_base, "--",row,".html"))
-      html = rai_make_tab_prompt_html(pru$project_dir,tabid = tabid, tab_main = df, all_ref_li=pru[["all_ref_li"]], all_part_df = pru[["all_part_df"]], outfile=tab_html_file)
+      html = rai_media_tab_html(pru$project_dir,tabid = tabid, tab_main = df, all_ref_li=pru[["all_ref_li"]], all_part_df = pru[["all_part_df"]], outfile=tab_html_file)
       if (file.exists(tab_html_file)) {
         media_files = tab_html_file
       }
@@ -222,30 +223,3 @@ proc_tab_extra_run = function(pru) {
   return(invisible(pru))
 }
 
-
-text_table = function(df, header = cols, col_sep = "|", cols=names(df), header_line_char="-", header_line_col_sep="+") {
-  restore.point("text_table")
-  txt = rep("", NROW(df)+2)
-  i = 1
-  for (i in seq_along(cols)) {
-    col = cols[[i]]
-    val = as.character(df[[col]])
-    nc = max(nchar(c(header[i],val)))
-    val_str = stri_pad_right(val, nc+1)
-    header_str = stri_pad_right(header[i],nc+1)
-    add_left = (i>1)
-    if (add_left) {
-      val_str = paste0(col_sep, " ", val_str)
-      header_str = paste0(col_sep, " ", header_str)
-    }
-    header_line = NULL
-    if (nchar(header_line_char)>0) {
-      header_line = paste0(rep(header_line_char,nc+1+add_left), collapse="")
-      if (add_left) {
-        header_line = paste0(header_line_col_sep, header_line)
-      }
-    }
-    txt = paste0(txt, c(header_str, header_line, val_str))
-  }
-  paste0(txt, collapse="\n")
-}

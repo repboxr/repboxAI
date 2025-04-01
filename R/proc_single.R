@@ -14,7 +14,7 @@ example = function() {
 }
 
 #' Extracts tab_html from articles
-proc_single = function(project_dir, prod_id = c("tab_classify")[1], doc_type="art", doc_file_form_pref = doc_file_form_default_pref(), tab_main_pref = tab_main_default_pref(), add_all_doc=TRUE, add_all_tab = FALSE, add_all_static_do = FALSE, load_tab_main=TRUE, load_do_source = add_all_static_do, ai_opts = get_ai_opts(), verbose=TRUE, to_v0=TRUE, tpl_id = paste0(prod_id), use_schema = FALSE, overwrite=TRUE,...) {
+proc_single = function(project_dir, prod_id = c("tab_classify")[1], doc_type="art", doc_file_form_pref = doc_file_form_default_pref(), tab_main_pref = tab_main_default_pref(), add_all_doc=TRUE, add_all_tab = FALSE, add_all_static_do = FALSE, load_tab_main=TRUE, load_do_source = add_all_static_do, ai_opts = get_ai_opts(), verbose=TRUE, to_v0=TRUE, tpl_id = paste0(prod_id), tab_main_chunk_size = NULL, use_schema = FALSE, overwrite=TRUE,...) {
   restore.point("proc_single")
   fp_dir = file.path(project_dir, "fp", paste0("prod_",doc_type))
   
@@ -22,7 +22,11 @@ proc_single = function(project_dir, prod_id = c("tab_classify")[1], doc_type="ar
   
   proc_info = rai_make_proc_info(prod_id=prod_id,ai_opts = ai_opts,tpl_file = tpl_file, json_mode=TRUE, use_schema = use_schema, tpl_id=tpl_id)
   
-  pru = pru_init(fp_dir,prod_id,proc_info=proc_info,to_v0=to_v0, ai_opts=ai_opts, project_dir=project_dir, doc_type=doc_type, doc_file_form_pref =  doc_file_form_pref, tab_main_pref = tab_main_pref, add_all_doc=add_all_doc, add_all_tab = add_all_tab, add_all_static_do = add_all_static_do, load_tab_main=load_tab_main, load_do_source = load_do_source)
+  if (!is.null(tab_main_chunk_size)) {
+    proc_info$proc_id = paste0(proc_info$proc_id,"-c",tab_main_chunk_size)
+  }
+  
+  pru = pru_init(fp_dir,prod_id,proc_info=proc_info,to_v0=to_v0, ai_opts=ai_opts, project_dir=project_dir, doc_type=doc_type, doc_file_form_pref =  doc_file_form_pref, tab_main_pref = tab_main_pref, add_all_doc=add_all_doc, add_all_tab = add_all_tab, add_all_static_do = add_all_static_do, load_tab_main=load_tab_main, load_do_source = load_do_source, tab_main_chunk_size = tab_main_chunk_size)
 
   
   if (!overwrite) if (fp_ver_dir_ok(pru$ver_dir)) return(NULL)
@@ -80,17 +84,31 @@ proc_single_run = function(pru) {
     values$cur_doc = "an online appendix"
   }
   
-  if (!is.null(pru[["tab_main"]]))
-    values = rai_prompt_value_tablist(pru$tab_main, values)
-  
   if (!is.null(pru$do_df)) {
     values = rai_prompt_value_dolist(pru$do_df, values)
   }
 
   rai = rai_init(project_dir,proc_info = pru$proc_info,media_files = NULL,context = pru$context)
+  
+  
+  n_tab = NROW(pru$tab_main)
+  if (is.null(pru$tab_main_chunk_size) | isTRUE(n_tab <= pru$tab_main_chunk_size)) {
+    if (!is.null(pru[["tab_main"]]))
+      values = rai_prompt_value_tablist(pru$tab_main, values)
     
-  res = ai_run(rai, values=values)
-  pru$items = list(res)
+    res = ai_run(rai, values=values)
+    pru$items = list(res)
+  }  else {
+    inds = seq_len(n_tab)
+    chunks  = split(inds, ceiling(seq_along(ind) / m))
+    pru = pru_make_items(pru, num_items = length(chunks), function(row, pru,...) {
+      restore.point("pru_tab_overview_run_inner")
+      tab_df = pru$tab_main[chunk[row],]      
+      if (!is.null(pru[["tab_main"]]))
+        values = rai_prompt_value_tablist(tab_df, values)
+      res = ai_run(rai, values=values)
+    })
+  }
   pru = pru_set_status(pru, pru$items)
   
   restore.point("post_single_rai_run")

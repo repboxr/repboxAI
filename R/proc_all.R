@@ -24,8 +24,9 @@ example = function() {
   
   parent_dir = "~/repbox/projects_share"
   steps = repbox_fp_steps(map_reg_static = TRUE)
+  steps = repbox_fp_steps(reg_classify_static = TRUE)
   project_dirs = repboxExplore::get_project_dirs("~/repbox/projects_share")
-  project_dir = project_dirs[2]
+  #project_dir = project_dirs[1]
   for (project_dir in project_dirs) {
     cat("\n", project_dir, "\n")
     repbox_run_fp(project_dir,steps, overwrite = FALSE)
@@ -56,12 +57,12 @@ example = function() {
   
 }
 
-repbox_fp_steps = function(tab_given=FALSE, tab_notes_pdf=FALSE, tab_html_pdf=FALSE, tab_main=FALSE, ev_tab=FALSE, readme=FALSE, readme_overview=readme, readme_var=readme, readme_script_tab_fig = readme, readme_data=readme, tab_classify = FALSE, by_tab_classify = FALSE, by_tab_classify_nodoc=FALSE, map_reg_static = FALSE) {
+repbox_fp_steps = function(tab_given=FALSE, tab_notes_pdf=FALSE, tab_html_pdf=FALSE, tab_main=FALSE, ev_tab=FALSE, readme=FALSE, readme_overview=readme, readme_var=readme, readme_script_tab_fig = readme, readme_data=readme, tab_classify = FALSE, by_tab_classify = FALSE, by_tab_classify_nodoc=FALSE, map_reg_static = FALSE, reg_classify_static=FALSE) {
   as.list(sys.frame(sys.parent(0)))
 }
 
 
-repbox_fp_steps_from = function(tab_given=FALSE, tab_notes_pdf=tab_given, tab_html_pdf=tab_notes_pdf, tab_main=tab_html_pdf, ev_tab=tab_main, readme=ev_tab, readme_overview=readme, readme_var=readme, readme_script_tab_fig = readme, readme_data=readme, tab_classify = readme_data, by_tab_classify = tab_classify, by_tab_classify_nodoc=by_tab_classify, map_reg_static = by_tab_classify_nodoc) {
+repbox_fp_steps_from = function(tab_given=FALSE, tab_notes_pdf=tab_given, tab_html_pdf=tab_notes_pdf, tab_main=tab_html_pdf, ev_tab=tab_main, readme=ev_tab, readme_overview=readme, readme_var=readme, readme_script_tab_fig = readme, readme_data=readme, tab_classify = readme_data, by_tab_classify = tab_classify, by_tab_classify_nodoc=by_tab_classify, map_reg_static = by_tab_classify_nodoc, reg_classify_static=map_reg_static) {
   as.list(sys.frame(sys.parent(0)))
 }
 
@@ -123,6 +124,19 @@ repbox_run_fp = function(project_dir, steps = repbox_fp_steps_from(TRUE), overwr
   if (steps$map_reg_static) {
     for (dt in doc_type) {
       proc_single(project_dir,doc_type=dt, "map_reg_static", add_all_doc = TRUE, add_all_tab = TRUE,add_all_static_do = TRUE,overwrite = overwrite)
+    }
+  }
+  if (steps$reg_classify_static) {
+    for (dt in doc_type) {
+      cat("\nreg_classify_static for", dt, "of", project_dir, "\n")
+      pru = 
+        rai_pru_base(project_dir, "reg_classify_static", doc_type="art", overwrite=overwrite) %>%
+        rai_pru_add_doc() %>%
+        rai_pru_add_tab_df() %>%
+        rai_pru_add_reg_list_static() %>%
+        rai_pru_add_tab_media(in_context=FALSE)
+      
+      proc_rai_pru(pru)
     }
   }
   

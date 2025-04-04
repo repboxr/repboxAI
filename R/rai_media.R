@@ -9,10 +9,13 @@ example = function() {
 
 rai_media_all_static_do = function(project_dir, script_df = rai_load_do_source(project_dir)) {
   restore.point("rai_make_all_static_do")
+  if (!has_col(script_df,"script_file")) {
+    script_df = script_df_shorten_file(script_df)
+  }
   
   txt = paste0(
     paste(rep("*", 60), collapse=""),"\n",
-    script_df$file,"\n",
+    script_df$script_file,"\n",
     paste(rep("*", 60), collapse=""),"\n\n",
     "Below is the code of ", script_df$file_path, " with line numbers\n\n",
     add_line_numbers_to_code(script_df$text),

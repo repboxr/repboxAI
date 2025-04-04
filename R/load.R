@@ -20,9 +20,9 @@ rai_pick_tab_ver = function(fp_dir, prod_id = "tab_html", pref=NULL, proc_id=NUL
 # to reduce length of output tokens
 script_df_shorten_file = function(script_df) {
   if (!anyDuplicated(script_df$file_path)) {
-    script_df$file = basename(script_df$file_path)
+    script_df$script_file = basename(script_df$file_path)
   } else {
-    script_df$file = script_df$file_path
+    script_df$script_file = script_df$file_path
   }
   script_df
 }
@@ -56,18 +56,6 @@ rai_pick_ref_li_doc_dir = function(project_dir, doc_type="art", tab_ref_pref = t
   if (length(files)==0) return(NULL)
   file = files[[1]]
   dirname(file)
-}
-
-doc_file_form_default_pref = function() {
-  c("html","pdf","mocr_md", "pdf_txt")
-}
-
-tab_main_default_pref = function() {
-  c("html","pdf-g*","mocr","pdf_txt")
-}
-
-tab_ref_default_pref = function() {
-  c("html", "mocr","pdf")
 }
 
 

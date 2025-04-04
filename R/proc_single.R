@@ -14,7 +14,7 @@ example = function() {
 }
 
 #' Extracts tab_html from articles
-proc_single = function(project_dir, prod_id = c("tab_classify")[1], doc_type="art", doc_file_form_pref = doc_file_form_default_pref(), tab_main_pref = tab_main_default_pref(), add_all_doc=TRUE, add_all_tab = FALSE, add_all_static_do = FALSE, load_tab_main=TRUE, load_do_source = add_all_static_do, ai_opts = get_ai_opts(), verbose=TRUE, to_v0=TRUE, tpl_id = paste0(prod_id), tab_main_chunk_size = NULL, use_schema = FALSE, overwrite=TRUE,...) {
+proc_single = function(project_dir, prod_id = c("tab_classify")[1], doc_type="art", doc_file_form_pref = doc_file_form_default_pref(), tab_main_pref = tab_main_default_pref(), add_all_doc=TRUE, add_all_tab = FALSE, add_all_static_do = FALSE, add_reg_list_static = FALSE, map_reg_static_pref = map_reg_static_default_pref(), load_tab_main=TRUE, load_do_source = add_all_static_do, ai_opts = get_ai_opts(), verbose=TRUE, to_v0=TRUE, tpl_id = paste0(prod_id), tab_main_chunk_size = NULL, use_schema = FALSE, overwrite=TRUE,...) {
   restore.point("proc_single")
   fp_dir = file.path(project_dir, "fp", paste0("prod_",doc_type))
   

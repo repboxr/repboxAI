@@ -15,27 +15,11 @@ example = function() {
   project_dir = "~/repbox/projects_share/qje_3036349" # hx wrong col align
   project_dir = "~/repbox/projects_share/restat_2689366" 
   project_dir = "~/repbox/projects_share/restud_82_2_12" 
-  project_dir = "~/repbox/projects_share/restud_82_2_12" 
-  
-  doc_dir = "~/repbox/projects_share/aeri_1_2_6/doc/art_pdf"
-  doc_dir = "~/repbox/projects_share/aeri_1_2_6/doc/art_mocr"
-
   project_dir = "~/repbox/projects_share/aeri_1_2_6"
+  
+  project_dir = "~/repbox/projects_share/restud_82_2_12" 
   proc_tab_given(project_dir)
-  
-  
-  proc_tab_doc(doc_dir)
-  
-  #library(repboxRun)
-  #steps = repbox_steps_from(art = TRUE,reproduction = FALSE)
-  #repbox_run_project(project_dir,lang="stata", steps=steps)
-  
-  
-  library(repboxArt)
-  
-  prods = repbox_prods()
-  pru = proc_tab_html_hx(project_dir, prods)
-  rstudioapi::filesPaneNavigate(pru$ver_dir)
+  rstudioapi::filesPaneNavigate(project_dir)
 }
 
 proc_tab_given = function(project_dir, to_v0=TRUE, doc_form=NULL, doc_type=NULL) {
@@ -67,7 +51,7 @@ proc_doc_tab_given = function(doc_dir, to_v0=TRUE) {
   }
   if (just_raw) {
     df$raw_tabhtml <- stri_replace_all_fixed(df$raw_tabhtml, "\u2003", "")
-    df$tabhtml = sapply(df$raw_tabhtml,html_table_add_cellnum_row_col)
+    df$tabhtml = sapply(df$raw_tabhtml,html_table_add_cellnum_row_col, id_prefix = paste0("cell-", df$tabid, "_"))
   }
   #proc_id = paste0("doc_", doc_form)
   proc_info = data.frame(prod_id=prod_id, proc_id = proc_id, doc_form=doc_form)

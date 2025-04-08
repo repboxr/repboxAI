@@ -1,6 +1,6 @@
 # Repbox AI process infos
 
-rai_make_proc_info = function(prod_id, ai_opts,tpl_file=NA,json_mode=TRUE, use_schema=FALSE, raw=FALSE,tpl_id=NULL,doc_file_form=NULL, proc_id_prefix="",proc_id_postfix = "",  ...) {
+rai_make_proc_info = function(prod_id, ai_opts,tpl_file=NA,json_mode=TRUE, use_schema=FALSE, raw=FALSE,tpl_id=NULL,doc_file_form=NULL, proc_prefix="",proc_postfix = "",  ...) {
   schema_opt = case_when(
     use_schema ~ "s",
     json_mode ~ "j",
@@ -9,7 +9,7 @@ rai_make_proc_info = function(prod_id, ai_opts,tpl_file=NA,json_mode=TRUE, use_s
   schema_opt_str = ifelse(schema_opt=="s", "s","")
   temp_str = ifelse(is.true(ai_opts$temperature > 0), paste0("t",round(10*ai_opts$temperature,0)),"")
   model_short = rai_model_short(ai_opts$model)
-  proc_id = paste0(proc_id_prefix,model_short,schema_opt_str, temp_str, proc_id_postfix)
+  proc_id = paste0(proc_prefix,model_short,schema_opt_str, temp_str, proc_postfix)
   if (raw) {
     proc_id = paste0("raw_", proc_id)
   }

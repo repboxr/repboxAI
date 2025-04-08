@@ -204,20 +204,13 @@ repbox_readme_prods = function() {
 
 repbox_map_prods = function() {
   prods_define(
-    prod_define("tab_reg_comma",
-      list(
-        tabid = schema_str(),
-        reg_num = schema_int("An index number indexing the regression shown in the table. Start with 1 for the first regression and increment by 1."),
-        reg_cell_ids = schema_str("A comma separated list of all cell ids ")
-      )
-    ),
     prod_define("map_reg_static",
       list(
         tabid = schema_str("The table ID as stated in the list of tables above."),
         reg_ind = schema_int("A counter that provides a uniqe integer number for each regression that you have identified across all tables. Start with 1 and increment for each regression."),
         script_file = schema_str("The name of the script file, as listed in the list of script files above. I.e. include file paths if they are stated in the list above."),
         code_line = schema_int("The code line of the regression command in the script file, corresponding to the particular regression shown in the table. If the command extends over more than one line, write down the first line. If certain cells"),
-        cell_ids = schema_str("A comma separated list of all cell ids of those cells in the HTML version of the table that correspond to this specific regression and whose value was computed by the specified code line. Each cell id can be found as the 'id' tag of the corresponding <td> or <th> element of the HTML version of the article's table. Only add cells that show numeric results, e.g. estimated coefficient, or number of observations, but no title cells or cells showing variable labels. Some tables in articles are structured such that some descriptive statistics, like the number of observations are shown on the bottom of a column and apply to multiple regressions shown in that column. Add the corresponding cell id for every regression, that they apply to.")
+        cell_ids = schema_str("A comma separated list of all cell ids of those cells in the HTML version of the table that correspond to this specific regression and whose value was computed by the specified code line. E.g. for a table with tabid='2', this comma separated string of cell ids might look like 'c2_10,c2-12,c2-14'. Each cell id can be found as the 'id' tag of the corresponding <td> or <th> element of the HTML version of the article's table. Only add cells that show numeric results, e.g. estimated coefficient, or number of observations, but no title cells or cells showing variable labels. Some tables in articles are structured such that some descriptive statistics, like the number of observations are shown on the bottom of a column and apply to multiple regressions shown in that column. Add the corresponding cell id for every regression, that they apply to.")
       )
     ),
     prod_define("reg_classify_static", list(
@@ -235,7 +228,7 @@ repbox_map_prods = function() {
       is_robustness_check = schema_bool("true if the regression is mainly a robustness check for other results."),
       label_dep_var = schema_str("Based on the information in the article and table find a suitable label for the dependent variable in the regression."),
       labels_coef_of_interest = schema_str("Often regression tables show both coefficients of primary interest for the analysis and coefficients for control variables that are not of primary interest. Sometimes only coefficient of primary interest are shown. Please state the variable lables of the coefficients of primary interest for this regression as shown in the table. If there are multiple variables of primary interest your string shall be a comma separted list, e.g. 'age,gender'."),
-      cell_id_coef_of_interest = schema_str("Please state the cell ids of all cells for this regression that show the numeric value of the  coefficient of interests or their standard error / p-value / t-value. Return a comma separated list of all those cell_ids, like 'cell-2_10,cell_2-12'."),
+      cell_id_coef_of_interest = schema_str("Please state the cell ids of all cells for this regression that show the numeric value of the  coefficient of interests or their standard error / p-value / t-value. Return a comma separated list of all those cell_ids, like 'c2_10,c2-12'."),
       analyses_heterogeneity = schema_bool("true if the  cofficient of interest of the regressions analyze heterogenous effects, e.g. if the regression provided information on how treatment effect sizes differ between subgroups."),
       error_in_prompt_or_media = schema_str("Is there some inconsistency in the prompt or the attached media files, e.g. the media don't show the tables listed in the prompt etc. This could be an indicator for some error in my pipeline. If such an inconsistency exists, briefly describe it only for the first regression. If all seems ok, set to an empty string. In later regressions always set to an empty string.")
       

@@ -1,15 +1,17 @@
 example = function() {
   #ai_clear_cache()
-  project_dir = "~/repbox/projects_share/aeri_1_2_6"
   library(repboxAI)
   library(aikit)
   rgemini::set_gemini_api_key(file = "~/repbox/gemini/gemini_api_key.txt")
   set_ai_opts(model = "gemini-2.0-flash-thinking-exp")
   set_ai_opts(model = "gemini-2.0-flash")
-  project_dir = "/home/rstudio/repbox/projects_share/ecta_84_2_6" 
+  project_dir = "~/repbox/projects_share/aeri_1_2_6"
+  project_dir = "~/repbox/projects_share/aejapp_1_2_4"
+  project_dir = "~/repbox/projects_share/qje_3036349" 
   #steps = repbox_fp_steps_from(tab_given = TRUE, tab_notes_pdf = FALSE, tab_html_pdf = FALSE, tab_main = TRUE, readme = FALSE)
-  steps = repbox_fp_steps_from(tab_given = TRUE,readme = FALSE)
-  repbox_run_fp(project_dir, steps,overwrite = TRUE)
+  steps = repbox_fp_steps(by_tab_classify_nodoc =  TRUE)
+  steps = repbox_fp_steps_base()
+  repbox_run_fp(project_dir, steps,overwrite = FALSE)
   rstudioapi::filesPaneNavigate(project_dir)
   
   
@@ -56,6 +58,15 @@ example = function() {
   project_dirs = repboxExplore::get_project_dirs("~/repbox/projects_share")
   
 }
+
+repbox_fp_steps_base = function() {
+  repbox_fp_steps_from(tab_given=TRUE,by_tab_classify = FALSE)
+}
+
+repbox_fp_steps_advanced = function() {
+  repbox_fp_steps_from(map_reg_static = TRUE)
+}
+
 
 repbox_fp_steps = function(tab_given=FALSE, tab_notes_pdf=FALSE, tab_html_pdf=FALSE, tab_main=FALSE, ev_tab=FALSE, readme=FALSE, readme_overview=readme, readme_var=readme, readme_script_tab_fig = readme, readme_data=readme, tab_classify = FALSE, by_tab_classify = FALSE, by_tab_classify_nodoc=FALSE, map_reg_static = FALSE, reg_classify_static=FALSE) {
   as.list(sys.frame(sys.parent(0)))
@@ -108,32 +119,53 @@ repbox_run_fp = function(project_dir, steps = repbox_fp_steps_from(TRUE), overwr
 
   if (steps$tab_classify) {
     for (dt in doc_type) {
-      proc_tab_extra(project_dir, "tab_classify", doc_type="art",overwrite = overwrite)
+      pru = 
+        rai_pru_base(project_dir, "tab_classify",tpl_id = "tab_classify", doc_type=dt, overwrite=overwrite) %>%
+        rai_pru_add_doc() %>%
+        rai_pru_add_tab_df() %>%
+        rai_pru_add_tab_media(by_tab = TRUE, add_ref = TRUE) 
+      proc_rai_pru(pru)
     }
   }
   if (steps$by_tab_classify) {
     for (dt in doc_type) {
-      proc_by_tab_extra(project_dir, "tab_classify", add_doc=TRUE, add_tab_main = TRUE, add_tab_ref=TRUE, doc_type=dt,overwrite = overwrite)
+      pru = 
+        rai_pru_base(project_dir, "tab_classify",tpl_id = "by_tab_classify", doc_type=dt, overwrite=overwrite, proc_postfix = "_bytab") %>%
+        rai_pru_add_doc() %>%
+        rai_pru_add_tab_df(by_tab = TRUE) %>%
+        rai_pru_add_tab_media(by_tab = TRUE, add_ref = TRUE) 
+      proc_rai_pru(pru)
     }
   }
   if (steps$by_tab_classify_nodoc) {
     for (dt in doc_type) {
-      proc_by_tab_extra(project_dir, "tab_classify", add_doc=FALSE, add_tab_main = TRUE, add_tab_ref=TRUE, doc_type=dt,overwrite = overwrite)
+      pru = 
+        rai_pru_base(project_dir, "tab_classify",tpl_id = "by_tab_classify_nodoc", proc_postfix = "_bytab_nodoc", doc_type=dt, overwrite=overwrite) %>%
+        rai_pru_add_tab_df(by_tab = TRUE) %>%
+        rai_pru_add_tab_media(by_tab = TRUE, add_ref = TRUE) 
+      proc_rai_pru(pru)
     }
   }
   if (steps$map_reg_static) {
     for (dt in doc_type) {
-      proc_single(project_dir,doc_type=dt, "map_reg_static", add_all_doc = TRUE, add_all_tab = TRUE,add_all_static_do = TRUE,overwrite = overwrite)
+      #proc_single(project_dir,doc_type=dt, "map_reg_static", add_all_doc = TRUE, add_all_tab = TRUE,add_all_static_do = TRUE,overwrite = overwrite)
+      pru = 
+        rai_pru_base(project_dir, "map_reg_static", doc_type=dt, overwrite=overwrite) %>%
+        rai_pru_add_doc() %>%
+        rai_pru_add_tab_df() %>%
+        rai_pru_add_tab_media(in_context=FALSE) %>%
+        rai_pru_add_static_do()
+      proc_rai_pru(pru)
     }
   }
   if (steps$reg_classify_static) {
     for (dt in doc_type) {
       cat("\nreg_classify_static for", dt, "of", project_dir, "\n")
       pru = 
-        rai_pru_base(project_dir, "reg_classify_static", doc_type="art", overwrite=overwrite) %>%
+        rai_pru_base(project_dir, "reg_classify_static", doc_type=dt, overwrite=overwrite) %>%
         rai_pru_add_doc() %>%
         rai_pru_add_tab_df() %>%
-        rai_pru_add_reg_list_static() %>%
+        rai_pru_add_reg_list_static(filter_tab_df = TRUE) %>%
         rai_pru_add_tab_media(in_context=FALSE)
       
       proc_rai_pru(pru)
@@ -203,4 +235,39 @@ repbox_rerun_errors = function(project_dirs, steps = repbox_fp_steps_from(TRUE))
   if (length(ver_dirs)==0) return(NULL)
   fp_rerun_all_error_ver(ver_dirs=ver_dirs)
   invisible(ver_dirs)
+}
+
+fp_count_prods = function(parent_dir) {
+  ver_dirs = fp_all_ver_dirs(parent_dir)
+  
+  df = tibble(
+    ver_dir = fp_all_ver_dirs(parent_dir),
+    proc_dir = fp_ver_dir_to_proc_dir(ver_dir),
+    prod_dir = fp_proc_dir_to_prod_dir(proc_dir),
+    proc_id = fp_proc_dir_to_proc_id(proc_dir),
+    prod_id = fp_prod_dir_to_prod_id(prod_dir),
+    fp_dir = fp_prod_dir_to_fp_dir(prod_dir)
+  )
+  
+  prod_df = df %>%
+    group_by(prod_id) %>%
+    summarize(num_fp = n_distinct(fp_dir))
+  
+  proc_df = df %>%
+    group_by(prod_id, proc_id) %>%
+    summarize(num_fp = n_distinct(fp_dir))
+  
+  
+  prod_ids = fp_ver_dir_to_prod_id(ver_dirs) 
+  
+}
+
+fp_find_missing_prod = function(parent_dir, prod_id=NULL) {
+  parent_dir = "~/repbox/projects_share"
+  restore.point("fp_find_missing_prod")
+  ver_dirs = fp_all_ver_dirs(parent_dir)
+  if (is.null(prod_id))
+    prod_ids = fp_ver_dir_to_prod_id(ver_dirs) 
+  
+    
 }

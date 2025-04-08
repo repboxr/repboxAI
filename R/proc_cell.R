@@ -51,10 +51,8 @@ proc_raw_tab_html_to_cell_base = function(org_pru=NULL, ver_dir=org_pru$ver_dir,
   i = 1
   cell_df = bind_rows(lapply(seq_len(NROW(tab_df)), function(i) {
     restore.point("shkfjhksfdo")
-    cell_df = normalized_html_tab_to_cell_df(tab_df$tabhtml[[i]])
-    cell_df = add_col_left(cell_df, tabid=tab_df$tabid[[i]])
+    cell_df = normalized_html_tab_to_cell_df(tab_df$tabhtml[[i]], tab_df$tabid)
     cell_df = cells_add_cell_base(cell_df,split_multi_num = TRUE)
-    cell_df$cellid = paste0(tab_df$tabid[i],"_", stri_sub(cell_df$cellid,6))
     cell_df      
   }))
   prod = repbox_prod("cell_base")
@@ -83,8 +81,8 @@ proc_tab_html_to_cell_list = function(pru=NULL, ver_dir=pru$ver_dir, prods=repbo
   i = 1
   cell_df = bind_rows(lapply(seq_len(NROW(df)), function(i) {
     restore.point("shkfjhksfdo")
-    cell_df = normalized_html_tab_to_cell_df(df$tabhtml[[i]])
-    cell_df = add_col_left(cell_df, tabid=df$tabid[i],otabid = df$otabid[i])
+    cell_df = normalized_html_tab_to_cell_df(df$tabhtml[[i]], tabid=df$tabid[i])
+    cell_df = add_col_left(cell_df,otabid = df$otabid[i])
     cell_df$cellid = paste0(df$tabid[i],"_", stri_sub(cell_df$cellid,6))
     cell_df      
   }))

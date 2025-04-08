@@ -9,6 +9,98 @@ example = function() {
   proc_id = NULL
 }
 
+# previously some cellid had form cell-2_4
+# others just 2_4
+# now common format c2_4
+repair_cell_id = function() {
+  parent_dir = "~/repbox/projects_share"
+  project_dirs = repboxExplore::get_project_dirs(parent_dir)
+
+  ver_dirs = fp_all_ver_dirs(project_dirs, "tab_html")
+  ver_dirs = fp_all_ver_dirs(project_dirs, "tab_main")
+  
+  ver_dir = ver_dirs[1]
+  for (ver_dir in ver_dirs) {
+    prod_df = fp_load_prod_df(ver_dir)
+    html = prod_df$tabhtml
+    html = html %>% stri_replace_all_fixed('id = "cell-cell-', 'id="')
+    
+    html = html %>% stri_replace_all_fixed('id="cell-', 'id="')
+
+    html = sapply(seq_along(html), function(i) {
+      str = html[i]
+      tabid = prod_df$tabid[i]
+      str = stri_replace_all_regex(str, 'id="(\\d+)"', paste0('id="c', tabid, '_$1"'))[[1]]
+      str = stri_replace_all_regex(str, 'id="(\\d+)-(\\d+)"','id="$1_$2"')[[1]]
+      str
+    })
+    prod_df$tabhtml = html
+    fp_save_prod_df(prod_df, ver_dir)
+  }
+
+  ver_dirs = fp_all_ver_dirs(project_dirs, "cell_base")
+  ver_dirs = fp_all_ver_dirs(project_dirs, "cell_list")
+  ver_dir = ver_dirs[1]
+  
+  for (ver_dir in ver_dirs) {
+    prod_df = fp_load_prod_df(ver_dir)
+    cellid = prod_df$cellid
+    cellid = stri_replace_first_fixed(cellid, "cell-","")
+    cellid = stri_replace_all_fixed(cellid,  '-',"_")
+    
+    rows = stri_detect_regex(cellid,"^\\d+_\\d+$" )
+    cellid[rows] = paste0("c", cellid[rows])
+    rows = stri_detect_regex(cellid,"^\\d+$" )
+    cellid[rows] = paste0("c", prod_df$tabid[rows], "_", cellid[rows])
+    prod_df$cellid = cellid
+    fp_save_prod_df(prod_df, ver_dir, overwrite=TRUE)
+  }
+
+  
+  ver_dirs = fp_all_ver_dirs(project_dirs, "map_reg_static")
+  ver_dir = ver_dirs[1]
+  
+  for (ver_dir in ver_dirs) {
+    prod_df = fp_load_prod_df(ver_dir)
+    cellids = prod_df$cell_ids
+    i = 1
+    cellids = sapply(seq_along(cellids), function(i) {
+      str = cellids[i]
+      tabid = prod_df$tabid[i]
+      str = stri_replace_all_fixed(str, "cell-","")
+      str = stri_replace_all_regex(str,  '(?<=^|,)(\\d+)(?=,|$)', paste0(tabid,"_$1"))
+      str = stri_replace_all_fixed(str,  '-',"_")
+      str = stri_replace_all_regex(str,  '(?<=^|,)(\\d+_\\d+)(?=,|$)', paste0("c$1"))
+      str
+    })
+    prod_df$cell_ids = cellids
+    prod_df = rename.col(prod_df, "do_file", "script_file")
+    fp_save_prod_df(prod_df, ver_dir, overwrite=TRUE)
+  }
+  
+
+  ver_dirs = fp_all_ver_dirs(project_dirs, "reg_classify_static")
+  ver_dir = ver_dirs[1]
+  
+  for (ver_dir in ver_dirs) {
+    prod_df = fp_load_prod_df(ver_dir)
+    cellids = prod_df$cell_id_coef_of_interest
+    i = 1
+    cellids = sapply(seq_along(cellids), function(i) {
+      str = cellids[i]
+      tabid = prod_df$tabid[i]
+      str = stri_replace_all_fixed(str, "cell-","")
+      str = stri_replace_all_regex(str,  '(?<=^|,)(\\d+)(?=,|$)', paste0(tabid,"_$1"))
+      str = stri_replace_all_fixed(str,  '-',"_")
+      str = stri_replace_all_regex(str,  '(?<=^|,)(\\d+_\\d+)(?=,|$)', paste0("c$1"))
+      str
+    })
+    prod_df$cell_id_coef_of_interest = cellids
+    fp_save_prod_df(prod_df, ver_dir, overwrite=TRUE)
+  }
+  
+}
+
 rename_map_reg_static_proc_id = function() {
   library(repboxAI)
   parent_dir = "~/repbox/projects_share"

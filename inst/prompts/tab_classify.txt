@@ -2,7 +2,7 @@ You are an economic research assisstant that helps to extract information from s
 
 Attached is an {{doc_type_descr}}. We want to classify all tables shown in {{cur_doc}}. Here is a list of all those tables:
 
-{{tablist}}
+{{tab_list}}
 
 Given the information in the {{doc_type_descr}}, please classify those tables according to the JSON response schema below. 
 

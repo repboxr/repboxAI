@@ -46,7 +46,7 @@ proc_doc_tab_html_from_pdf = function(doc_dir, tpl_num=1,prods=repbox_prods(), a
   doc_form = "pdf"
   tpl_file = file.path(rai_tpl_dir(), paste0(prod_id, "-", doc_form, "-", tpl_num, ".txt"))
   
-  proc_info = rai_make_proc_info(prod_id=prod_id,ai_opts = ai_opts,tpl_file = tpl_file, json_mode=FALSE, use_schema = FALSE, raw=TRUE, proc_id_prefix = "pdf-")
+  proc_info = rai_make_proc_info(prod_id=prod_id,ai_opts = ai_opts,tpl_file = tpl_file, json_mode=FALSE, use_schema = FALSE, raw=TRUE, proc_prefix = "pdf-")
 
   
   
@@ -83,7 +83,9 @@ pru_tab_html_pdf_run = function(pru) {
   if (!pru_is_ok(pru)) return(invisible(pru))
 
   df$raw_html = ai_combine_content_str(pru$items,err_val = NA_character_)
-  df$tabhtml = sapply(df$raw_html,html_table_add_cellnum_row_col)
+  df$tabhtml = sapply(seq_len(NROW(df)), function(i) {
+    html_table_add_cellnum_row_col(df$raw_html[i],tabid=df$tabid[i])
+  })
   prod_df = df_to_prod_df(df, repbox_prod("tab_html"))
   pru_save(pru, prod_df)
   rai_write_all_tables_html(prod_df, "tables.html", out_dir=pru$ver_dir, info=pru$proc_info)
@@ -121,7 +123,7 @@ proc_doc_tab_notes_from_pdf = function(doc_dir, tpl_num=1,use_schema=FALSE, to_v
   art_source = "pdf"
   tpl_file = file.path(rai_tpl_dir(), paste0(prod_id, "-", art_source, "-", tpl_num, ".txt"))
 
-  proc_info = rai_make_proc_info(prod_id=prod_id,ai_opts = ai_opts,tpl_file = tpl_file, json_mode=TRUE, use_schema = use_schema,proc_id_prefix = "pdf-")
+  proc_info = rai_make_proc_info(prod_id=prod_id,ai_opts = ai_opts,tpl_file = tpl_file, json_mode=TRUE, use_schema = use_schema,proc_prefix = "pdf-")
   
   fp_dir = doc_dir_to_fp_dir(doc_dir)
   project_dir = rai_fp_dir_to_project_dir(fp_dir)

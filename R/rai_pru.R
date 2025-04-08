@@ -19,15 +19,15 @@ example = function() {
 }  
 
 
-rai_pru_base = function(project_dir, prod_id, doc_type="art", ai_opts = get_ai_opts(), verbose=TRUE, to_v0=TRUE, tpl_id = paste0(prod_id), json_mode=TRUE, use_schema = FALSE, overwrite=FALSE, tpl_dir = rai_tpl_dir(), tpl_file = NULL) {
+rai_pru_base = function(project_dir, prod_id, doc_type="art", ai_opts = get_ai_opts(), verbose=TRUE, to_v0=TRUE, tpl_id = paste0(prod_id), json_mode=TRUE, use_schema = FALSE, overwrite=FALSE, tpl_dir = rai_tpl_dir(), tpl_file = NULL, proc_prefix = "", proc_postfix="") {
   fp_dir = file.path(project_dir, "fp", paste0("prod_",doc_type))
+  prefix = postfix = ""
   pru = copy_into_list()
   restore.point("rai_pru_base")
   
   pru$doc_types = repbox_doc_types(project_dir)
   pru$media_files = NULL
   pru$context_media_files = NULL
-  pru$proc_id_postfix = pru$proc_id_prefix = ""
   return(pru)
 }  
 
@@ -75,7 +75,7 @@ rai_pru_add_tab_df = function(pru, tab_prod_id = "tab_main", tab_df_pref = tab_d
   restore.point("rai_pru_add_tab_df")
   
   pru$tab_df_info = fp_pick_prod_ver(pru$fp_dir, tab_prod_id, pref=tab_df_pref)
-  if (NROW(pru$tab_df_info)==0) {
+  if (NROW(pru$tab_df_info)==0 | fp_is_err_obj(pru$tab_df_info)) {
     cat(paste0("\nPlease first successfully create ", tab_prod_id,".\n"))
     return(NULL)
   }
@@ -84,10 +84,10 @@ rai_pru_add_tab_df = function(pru, tab_prod_id = "tab_main", tab_df_pref = tab_d
   pru$tab_df = fp_load_prod_df(pru$tab_df_info$ver_dir)
   
   postfix=paste0("-", pru$tab_df_info$proc_id)
-  if (isTRUE(tab_chunk_size < NROW(pru$tab_df))) {
+  if (isTRUE(tab_chunk_size < NROW(pru$tab_df)) & !by_tab) {
     postfix = paste0(postfix, "_c",tab_chunk_size)     
   }
-  pru$proc_id_postfix = paste0(pru$proc_id_postfix, postfix)
+  pru$postfix = paste0(postfix, pru$postfix)
   
   if (!is.null(tab_chunk_size) & is.null(pru$itemize_by)) {
     pru$itemize_by = "tab_df"
@@ -97,13 +97,40 @@ rai_pru_add_tab_df = function(pru, tab_prod_id = "tab_main", tab_df_pref = tab_d
   pru
 }
 
-rai_pru_add_tab_media = function(pru, tab_df = pru$tab_df, in_context=TRUE) {
+rai_pru_add_tab_media = function(pru, tab_df = pru$tab_df, by_tab = FALSE, add_ref = FALSE, in_context=FALSE, tab_ref_pref = tab_ref_default_pref()) {
   if (is.null(pru)) return(pru)
   restore.point("rai_pru_add_tab_media")
   # most overwrite every time: not a unique name
   base = paste0(pru$doc_type, "_tabs.html")
-  outfile = rai_media_all_tab_html(pru$project_dir,tab_df,doc_type=pru$doc_type, base)
-  rai_pru_add_media(pru, outfile, in_context)
+  
+  if (add_ref & !by_tab) stop("Currently table references can only be added (add_ref=TRUE) if by_tab=TRUE")
+  
+  if (!by_tab) {
+    if (!isTRUE(pru$item_chunk_size==1)) {
+      stop("by_tab=TRUE only works if yo have set by_tab=TRUE in rai_pru_add_tab_df.")
+    }
+    outfile = rai_media_all_tab_html(pru$project_dir,tab_df,doc_type=pru$doc_type, base)
+    pru = rai_pru_add_media(pru, outfile, in_context)
+  } else {
+    pru$add_by_tab_media = TRUE
+    pru$tab_media_add_ref = add_ref
+    
+    if (add_ref) {
+      pru$ref_li_doc_dirs = sapply(pru$doc_types, function(dt) {
+        rai_pick_ref_li_doc_dir(project_dir,doc_type=dt,tab_ref_pref)
+      })
+      if (length(pru$ref_li_doc_dir)>0) {
+        pru$ref_li_form = rdoc_form(pru$ref_li_doc_dirs[[1]])
+        pru$all_ref_li = lapply(pru$ref_li_doc_dirs, rdoc_load_ref_li)
+        pru$all_part_df = lapply(pru$ref_li_doc_dirs,rdoc_load_part_df)
+      }
+      
+    }
+    
+    
+    
+  }
+  pru
 }
 
 rai_pru_add_reg_list_static = function(pru, map_reg_static_pref = map_reg_static_default_pref(), filter_tab_df = TRUE) {
@@ -123,7 +150,7 @@ rai_pru_add_reg_list_static = function(pru, map_reg_static_pref = map_reg_static
     if (is.null(pru$tab_df)) stop("Please make sure to first call rai_pru_add_tab_df.")
     pru$tab_df = pru$tab_df[pru$tab_df$tabid %in% pru$map_df$tabid,]
   }
-  pru$proc_id_postfix = paste0("-", str.left.of(pru$map_ver_info$proc_id,"-"),pru$proc_id_postfix)
+  pru$postfix = paste0("-", str.left.of(pru$map_ver_info$proc_id,"-"),pru$postfix)
   pru
 }
 
@@ -134,6 +161,14 @@ rai_pru_add_media = function(pru, media_files, in_context = TRUE) {
   } else {
     pru$media_files = unique(c(pru$media_file, media_files))
   }
+  pru
+}
+
+rai_pru_add_static_do = function(pru, in_context=TRUE) {
+  restore.point("rai_pru_add_static_do")
+  pru$do_df = rai_load_do_source(project_dir) 
+  outfile = rai_media_all_static_do(project_dir,script_df = pru$do_df)
+  pru = rai_pru_add_media(pru,outfile, in_context=in_context)
   pru
 }
 
@@ -161,7 +196,10 @@ proc_rai_pru = function(pru) {
   if (is.null(pru[["tpl"]]))
     pru = rai_pru_set_tpl(pru)
   
-  pru$proc_info = rai_make_proc_info(prod_id=pru$prod_id,ai_opts = pru$ai_opts,tpl_file = pru$tpl_file, json_mode=pru$json_mode, use_schema = pru$use_schema, tpl_id=pru$tpl_id,proc_id_prefix = pru$proc_id_prefix, proc_id_postfix = pru$proc_id_postfix)
+  prefix = paste0(pru$proc_prefix, pru$prefix)
+  postfix = paste0(pru$postfix, pru$proc_postfix)
+  
+  pru$proc_info = rai_make_proc_info(prod_id=pru$prod_id,ai_opts = pru$ai_opts,tpl_file = pru$tpl_file, json_mode=pru$json_mode, use_schema = pru$use_schema, tpl_id=pru$tpl_id,proc_prefix = prefix, proc_postfix = postfix)
   
   pru$proc_id  = pru$proc_info$proc_id
   pru = pru_init_dirs(pru=pru)
@@ -194,7 +232,7 @@ proc_rai_pru = function(pru) {
     }
   }
   if ("script_list" %in% pru$tpl_var) {
-    values = rai_prompt_value_dolist(pru$do_df, values)
+    values = rai_prompt_value_script_list(pru$do_df, values)
   }
   pru$values = values
   
@@ -203,6 +241,11 @@ proc_rai_pru = function(pru) {
 
 proc_rai_pru_run = function(pru) {
   restore.point("proc_rai_pru_run")
+  
+  if (isTRUE(pru$verbose)) {
+    cat("\nRun ", pru$ver_dir,"\n")
+  }
+  
   project_dir = pru$project_dir
   
   if (length(pru$content_media_files)>0) {
@@ -224,18 +267,39 @@ proc_rai_pru_run = function(pru) {
   
   rai = rai_init(pru$project_dir,proc_info = pru$proc_info,media_files = pru[["media_files"]],context = pru[["context"]])
   
+  
   if (!is.null(pru$itemize_by)) {
+    org_media_files = pru$media_files
     item_df = pru[[pru$itemize_by]]
     inds = seq_len(NROW(item_df))
-    chunks  = split(inds, ceiling(seq_along(ind) / pru$chunk_size))
+    chunks  = split(inds, ceiling(seq_along(inds) / pru$item_chunk_size))
     num_items = length(chunks)
     
+    row = 1
     pru = pru_make_items(pru, num_items = num_items, function(row, pru,...) {
       restore.point("proc_rai_pru_run_item_fun")
-      tab_df = pru$tab_df[chunks[row],]
+      tab_df = pru$tab_df[chunks[[row]],]
+      media_files = org_media_files
+
+      if ("tabtitle" %in% pru$tpl_var & isTRUE(pru$itemize_by=="tab_df")) {
+        values$tabtitle = tab_df$tabtitle
+      }
+      
+            
       if ("tab_list" %in% pru$tpl_var & isTRUE(pru$itemize_by=="tab_df")) {
         values = rai_prompt_value_tab_list(tab_df, values)
-      }        
+      }
+      
+      if (pru$add_by_tab_media) {
+        tabid = tab_df$tabid
+        outfile = file.path(pru$project_dir,"fp","prompt_files",paste0("tab--",tabid,".html"))
+        html = rai_media_tab_html(pru$project_dir,tabid = tabid, tab_main = tab_df, all_ref_li=pru[["all_ref_li"]], all_part_df = pru[["all_part_df"]], outfile=outfile)
+        if (file.exists(outfile)) {
+          media_files = c(media_files, outfile)
+        }
+        rai$media_files = media_files
+      }
+      
       res = ai_run(rai, values=values)
     })
   } else {

@@ -51,7 +51,9 @@ proc_doc_tab_given = function(doc_dir, to_v0=TRUE) {
   }
   if (just_raw) {
     df$raw_tabhtml <- stri_replace_all_fixed(df$raw_tabhtml, "\u2003", "")
-    df$tabhtml = sapply(df$raw_tabhtml,html_table_add_cellnum_row_col, id_prefix = paste0("cell-", df$tabid, "_"))
+    df$tabhtml = sapply(seq_len(NROW(df)), function(i) {
+      html_table_add_cellnum_row_col(df$raw_tabhtml[i],tabid=df$tabid[i])
+    })
   }
   #proc_id = paste0("doc_", doc_form)
   proc_info = data.frame(prod_id=prod_id, proc_id = proc_id, doc_form=doc_form)

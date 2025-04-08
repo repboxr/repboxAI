@@ -38,6 +38,7 @@ rai_prompt_value_tab_list = function(tab_df, values = list(), header = c("tabid"
 }
 
 rai_prompt_value_script_list = function(script_df, values = list(), header = c("script_file")) {
-  values$script_list = text_table(script_df$script_file, header=header)
+  restore.point("rai_prompt_value_script_list")
+  values$script_list = text_table(script_df[c("script_file")], header=header)
   values
 }

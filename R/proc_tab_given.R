@@ -25,6 +25,7 @@ example = function() {
 proc_tab_given = function(project_dir, to_v0=TRUE, doc_form=NULL, doc_type=NULL) {
   restore.point("proc_tab_hx")
   doc_dirs = repboxDoc::repbox_doc_dirs(project_dir,doc_form = doc_form, doc_type=doc_type)
+  doc_dir = first(doc_dirs)
   for (doc_dir in doc_dirs) {
     proc_doc_tab_given(doc_dir, to_v0=to_v0)
   }

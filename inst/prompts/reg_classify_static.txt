@@ -83,7 +83,7 @@ JSON RESPONSE SCHEMA:
       },
       "cell_id_coef_of_interest": {
         "type": ["string", "null"],
-        "description": "Please state the cell ids of all cells for this regression that show the numeric value of the  coefficient of interests or their standard error / p-value / t-value. Return a comma separated list of all those cell_ids, like 'cell-2_10,cell_2-12'."
+        "description": "Please state the cell ids of all cells for this regression that show the numeric value of the  coefficient of interests or their standard error / p-value / t-value. Return a comma separated list of all those cell_ids, like 'c2_10,c2_12'."
       },
       "analyses_heterogeneity": {
         "type": ["bool", "null"],

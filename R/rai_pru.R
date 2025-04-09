@@ -106,12 +106,12 @@ rai_pru_add_tab_media = function(pru, tab_df = pru$tab_df, by_tab = FALSE, add_r
   if (add_ref & !by_tab) stop("Currently table references can only be added (add_ref=TRUE) if by_tab=TRUE")
   
   if (!by_tab) {
-    if (!isTRUE(pru$item_chunk_size==1)) {
-      stop("by_tab=TRUE only works if yo have set by_tab=TRUE in rai_pru_add_tab_df.")
-    }
     outfile = rai_media_all_tab_html(pru$project_dir,tab_df,doc_type=pru$doc_type, base)
     pru = rai_pru_add_media(pru, outfile, in_context)
   } else {
+    if (!isTRUE(pru$item_chunk_size==1)) {
+      stop("by_tab=TRUE only works if yo have set by_tab=TRUE in rai_pru_add_tab_df.")
+    }
     pru$add_by_tab_media = TRUE
     pru$tab_media_add_ref = add_ref
     

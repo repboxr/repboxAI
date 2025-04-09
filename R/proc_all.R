@@ -8,10 +8,18 @@ example = function() {
   project_dir = "~/repbox/projects_share/aeri_1_2_6"
   project_dir = "~/repbox/projects_share/aejapp_1_2_4"
   project_dir = "~/repbox/projects_share/qje_3036349" 
-  #steps = repbox_fp_steps_from(tab_given = TRUE, tab_notes_pdf = FALSE, tab_html_pdf = FALSE, tab_main = TRUE, readme = FALSE)
+  steps = repbox_fp_steps_from(tab_given = TRUE, tab_notes_pdf = FALSE, tab_html_pdf = FALSE, tab_main = TRUE, readme = FALSE)
   steps = repbox_fp_steps(by_tab_classify_nodoc =  TRUE)
+  steps = repbox_fp_steps(tab_given = TRUE)
   steps = repbox_fp_steps_base()
+  repbox_run_fp(project_dir, steps,overwrite = !TRUE)
+  
+  set_ai_opts(model = "gemini-2.5-pro-exp-03-25")
+  set_ai_opts(model = "gemini-2.0-flash")
+  steps = repbox_fp_steps_advanced()
   repbox_run_fp(project_dir, steps,overwrite = FALSE)
+  
+  
   rstudioapi::filesPaneNavigate(project_dir)
   
   
@@ -122,8 +130,8 @@ repbox_run_fp = function(project_dir, steps = repbox_fp_steps_from(TRUE), overwr
       pru = 
         rai_pru_base(project_dir, "tab_classify",tpl_id = "tab_classify", doc_type=dt, overwrite=overwrite) %>%
         rai_pru_add_doc() %>%
-        rai_pru_add_tab_df() %>%
-        rai_pru_add_tab_media(by_tab = TRUE, add_ref = TRUE) 
+        rai_pru_add_tab_df() #%>%
+        #rai_pru_add_tab_media(by_tab = FALSE, add_ref = FALSE) 
       proc_rai_pru(pru)
     }
   }
@@ -146,9 +154,9 @@ repbox_run_fp = function(project_dir, steps = repbox_fp_steps_from(TRUE), overwr
       proc_rai_pru(pru)
     }
   }
+  dt = first(doc_type)
   if (steps$map_reg_static) {
     for (dt in doc_type) {
-      #proc_single(project_dir,doc_type=dt, "map_reg_static", add_all_doc = TRUE, add_all_tab = TRUE,add_all_static_do = TRUE,overwrite = overwrite)
       pru = 
         rai_pru_base(project_dir, "map_reg_static", doc_type=dt, overwrite=overwrite) %>%
         rai_pru_add_doc() %>%

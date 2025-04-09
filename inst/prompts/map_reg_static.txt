@@ -47,7 +47,7 @@ JSON RESPONSE SCHEMA:
       },
       "cell_ids": {
         "type": "string",
-        "description": "A comma separated list of ALL cell ids of those cells in the HTML version of the table that correspond to this specific regression and whose value was computed by the specified code line. E.g. 'cell-2-12,cell-2-15'. Each cell id can be found as the 'id' tag of the corresponding <td> or <th> element of the HTML version of the article's table. Only add cells that show numeric results, e.g. estimated coefficient, or number of observations, but no title cells or cells showing variable labels. Some tables in articles are structured such that some descriptive statistics, like the number of observations are shown on the bottom of a column and apply to multiple regressions shown in that column. Add the corresponding cell id for every regression, that they apply to."
+        "description": "A comma separated list of ALL cell ids of those cells in the HTML version of the table that correspond to this specific regression and whose value was computed by the specified code line. E.g. 'c2_12,c2_15'. Each cell id can be found as the 'id' tag of the corresponding <td> or <th> element of the HTML version of the article's table. A cell id has the format 'c{tabid}_{counter}'. Only add cells that show numeric results, e.g. estimated coefficient, or number of observations, but no title cells or cells showing variable labels. Some tables in articles are structured such that some descriptive statistics, like the number of observations are shown on the bottom of a column and apply to multiple regressions shown in that column. Add the corresponding cell id for every regression, that they apply to."
       }
     }
   }

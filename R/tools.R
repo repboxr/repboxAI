@@ -5,27 +5,6 @@ example = function() {
   str = c("a,b,c","b,d","b")
 }
 
-copy_into_list <- function(source = parent.frame(), dest = list(), exclude = NULL) {
-  # Get all objects in the source environment
-  all_vars <- ls(envir = source, all.names = TRUE)
-  
-  # Filter out variables to exclude
-  if (length(exclude)>0) {
-    vars_to_copy <- setdiff(all_vars, exclude)
-  } else {
-    vars_to_copy <- all_vars
-  }
-  
-  # Vectorized assignment using mget() to get multiple objects at once
-  if (length(vars_to_copy) > 0) {
-    values <- mget(vars_to_copy, envir = source)
-    dest[names(values)] <- values
-  }
-  
-  # Return the updated destination list
-  return(dest)
-}
-
 null_to_na = function(x, na_val = NA_character_) {
   if (is.null(x)) return(na_val)
   x

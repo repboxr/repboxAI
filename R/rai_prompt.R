@@ -32,6 +32,13 @@ rai_prompt_value_reg_list_static = function(map_df, values=list()) {
   values
 }
 
+
+rai_prompt_value_reg_run_list = function(reg_df, values=list()) {
+  values$reg_run_list = text_table(reg_df[c("runid")])
+  values
+}
+
+
 rai_prompt_value_tab_list = function(tab_df, values = list(), header = c("tabid", "tab_title")) {
   values$tab_list = text_table(tab_df[c("tabid", "tabtitle")], header=header)
   values

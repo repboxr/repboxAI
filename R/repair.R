@@ -19,19 +19,20 @@ repair_cell_id = function() {
   ver_dirs = fp_all_ver_dirs(project_dirs, "tab_html")
   ver_dirs = fp_all_ver_dirs(project_dirs, "tab_main")
   
-  ver_dir = ver_dirs[1]
+  ver_dir = ver_dirs[33]
   for (ver_dir in ver_dirs) {
     prod_df = fp_load_prod_df(ver_dir)
     html = prod_df$tabhtml
     html = html %>% stri_replace_all_fixed('id = "cell-cell-', 'id="')
-    
+    html = html %>% stri_replace_all_regex('id[ ]*=[ ]*"', 'id="')
     html = html %>% stri_replace_all_fixed('id="cell-', 'id="')
 
     html = sapply(seq_along(html), function(i) {
       str = html[i]
       tabid = prod_df$tabid[i]
       str = stri_replace_all_regex(str, 'id="(\\d+)"', paste0('id="c', tabid, '_$1"'))[[1]]
-      str = stri_replace_all_regex(str, 'id="(\\d+)-(\\d+)"','id="$1_$2"')[[1]]
+      str = stri_replace_all_regex(str, 'id="(\\d+)-(\\d+)"','id="c$1_$2"')[[1]]
+      str = stri_replace_all_regex(str, 'id="(\\d+)_(\\d+)"','id="c$1_$2"')[[1]]
       str
     })
     prod_df$tabhtml = html

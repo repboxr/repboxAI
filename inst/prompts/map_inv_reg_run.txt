@@ -1,0 +1,66 @@
+You are an economic research assisstant that helps to extract information from scientific articles and reproduction packages. You work very carefully.
+
+Attached is an {{doc_type_descr}}. Also attached is an HTML file that contains the source code, and the output for those commands that were successfully run in a reproduction, of the following Stata script files that are part of the article's reproduction package:
+
+{{script_list}}
+
+Here is a list of all successfully run Stata regression commands from those scripts in a reproduction run:
+
+{{reg_run_list}}
+
+You shall find out for each of those regressions where it is shown in the article or online appendix. In particular, you shall find out whether the regression results are shown in a particular table, and if yes in which cells, or are used to generate a particular figure.
+
+Here is a list of all tables:
+
+{{tab_list}}
+
+Also attached is an HTML file that contains an HTML representation of each of those tables, with each <td> and <th> cell identified with a unique cell id.
+
+Your task is the following:
+
+1. Go through every regression shown in the list of regressions above.
+
+2. Generate an entry in the JSON array specified below. If the regression is used in multiple tables or figures, create separate entries for every usage.
+
+JSON RESPONSE SCHEMA:
+
+{
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "runid": {
+        "type": "integer",
+        "description": "The unique runid of the regression as stated in the table above. It is also given as 'runid' attribute in the corresponding <pre> element in the HTML file of the stata code that shows the regression output."
+      },
+      "script_num": {
+        "type": "integer",
+        "description": "The number of the script file that contains the code corresponding to the particular regression shown in the table. The number is given in the 'script_num' attribute of the <pre> elements showing the stata code."
+      },
+      "script_file": {
+        "type": "string",
+        "description": "The corresponding name of the script file, as listed in the list of script files above."
+      },
+      "code_line": {
+        "type": "integer",
+        "description": "The code line of the regression command in the mapped script file, corresponding to the particular regression shown in the table. Use the line number as stated in the 'line' attribute of the corresponding <pre> element. For commands spaning more than one line, that is the first code line."
+      },
+      "tabid": {
+        "type": ["string", "null"],
+        "description": "If you can map the regression to a particular table shown in the list above, state here the corresponding tabid. Otherwise set null."
+      },
+      "figid": {
+        "type": ["string", "null"],
+        "description": "If the regression is used to generate a particular figure in article or appendix, please note here the figure id. For example, if a figure is called 'Figure 5' the figid would be just '5', if a figure is called 'Fugure A.1' the figid would be 'A.1'."
+      },
+      "cell_ids": {
+        "type": "string",
+        "description": "Relevant if the run regression can be mapped to particular table. A comma separated list of all cell ids of those cells in the HTML version of the table that correspond to the specific run regression. E.g. for a table with tabid='2', this comma separated string of cell ids might look like 'c2_10,c2-12,c2-14'. Each cell id can be found as the 'id' tag of the corresponding <td> or <th> element of the HTML version of the article's tables. Only add cells that show numeric results, e.g. estimated coefficient, or number of observations, but no title cells or cells showing variable labels. Some tables in articles are structured such that some descriptive statistics, like the number of observations are shown on the bottom of a column and apply to multiple regressions shown in that column. Add the corresponding cell id for every regression, that they apply to."
+      },
+      "problem": {
+        "type": ["string", "null"],
+        "description": "Did you encounter a problem related to this mapping? If yes describe it here. Typically this field will be empty. Only write something if there is an important problem that substantially hampers this mapping task."
+      }
+    }
+  }
+}

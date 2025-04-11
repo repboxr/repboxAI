@@ -19,7 +19,7 @@ example = function() {
 }  
 
 
-rai_pru_base = function(project_dir, prod_id, doc_type="art", ai_opts = get_ai_opts(), verbose=TRUE, to_v0=TRUE, tpl_id = paste0(prod_id), json_mode=TRUE, use_schema = FALSE, overwrite=FALSE, tpl_dir = rai_tpl_dir(), tpl_file = NULL, proc_prefix = "", proc_postfix="") {
+rai_pru_base = function(project_dir, prod_id, doc_type="art", ai_opts = get_ai_opts(), verbose=TRUE, to_v0=TRUE, tpl_id = paste0(prod_id), json_mode=TRUE, use_schema = FALSE, overwrite=FALSE, tpl_dir = rai_tpl_dir(), tpl_file = NULL, proc_prefix = "", proc_postfix="", parcels=list()) {
   fp_dir = file.path(project_dir, "fp", paste0("prod_",doc_type))
   prefix = postfix = ""
   pru = copy_into_list()
@@ -164,13 +164,43 @@ rai_pru_add_media = function(pru, media_files, in_context = TRUE) {
   pru
 }
 
-rai_pru_add_static_do = function(pru, in_context=TRUE) {
+rai_pru_load_parcels = function(pru, parcel_names, parcels=pru[["parcels"]]) {
+  if (is.null(parcels)) parcels = list()
+  pru$parcels = repdb_load_parcels(pru$project_dir, parcel_names, parcels)
+  pru
+}
+
+rai_pru_add_static_do = function(pru, in_context=FALSE) {
   restore.point("rai_pru_add_static_do")
-  pru$do_df = rai_load_do_source(project_dir) 
+  pru = rai_pru_load_parcels(pru, "stata_source")
+  pru$do_df = rai_load_do_source(project_dir,pru$parcels) 
   outfile = rai_media_all_static_do(project_dir,script_df = pru$do_df)
   pru = rai_pru_add_media(pru,outfile, in_context=in_context)
   pru
 }
+
+rai_pru_add_reg_df = function(pru, parcels = pru$parcels) {
+  restore.point("rai_pru_add_reg_run_df")
+  pru = rai_pru_load_parcels(pru, "reg_core")
+  pru$reg_df = pru$parcels$reg_core$reg
+  pru
+}
+
+rai_pru_add_run_do = function(pru, in_context=FALSE, only_reg_df_output = FALSE) {
+  restore.point("rai_pru_add_run_do")
+  pru = rai_pru_load_parcels(pru, "stata_source")
+  pru$do_df = rai_load_do_source(project_dir,pru$parcels)
+  output_just_runid = NULL
+  if (only_reg_df_output) {
+    output_just_runid = pru$reg_df$runid
+  }
+  
+  outfile = rai_media_run_do(project_dir,parcels=pru$parcels, output_just_runid = output_just_runid)
+  pru = rai_pru_add_media(pru,outfile, in_context=in_context)
+  pru
+}
+
+
 
 rai_pru_set_tpl = function(pru, tpl_id=pru$tpl_id, tpl_dir=pru$tpl_dir, tpl_file = pru[["tpl_file"]], tpl=pru[["tpl"]]) {
   if (is.null(pru)) return(pru)
@@ -260,7 +290,9 @@ proc_rai_pru_run = function(pru) {
   if ("tab_list" %in% pru$tpl_var & !isTRUE(pru$itemize_by=="tab_df")) {
     values = rai_prompt_value_tab_list(pru$tab_df, values)
   }
-  
+  if ("reg_run_list" %in% pru$tpl_var) {
+    values = rai_prompt_value_reg_run_list(pru[["reg_df"]], values)
+  }
   if ("reg_list_static" %in% pru$tpl_var) {
     values = rai_prompt_value_reg_list_static(pru$map_df, values)
   }

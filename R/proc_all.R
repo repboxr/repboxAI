@@ -3,17 +3,18 @@ example = function() {
   library(repboxAI)
   library(aikit)
   rgemini::set_gemini_api_key(file = "~/repbox/gemini/gemini_api_key.txt")
-  set_ai_opts(model = "gemini-2.0-flash-thinking-exp")
   set_ai_opts(model = "gemini-2.0-flash")
-  project_dir = "~/repbox/projects_share/aeri_1_2_6"
   project_dir = "~/repbox/projects_share/aejapp_1_2_4"
   project_dir = "~/repbox/projects_share/qje_3036349" 
-  steps = repbox_fp_steps_from(tab_given = TRUE, tab_notes_pdf = FALSE, tab_html_pdf = FALSE, tab_main = TRUE, readme = FALSE)
-  steps = repbox_fp_steps(by_tab_classify_nodoc =  TRUE)
-  steps = repbox_fp_steps(tab_given = TRUE)
-  steps = repbox_fp_steps_base()
-  repbox_run_fp(project_dir, steps,overwrite = !TRUE)
-  
+  project_dir = "~/repbox/projects_share/aeri_1_2_6"
+  steps = repbox_fp_steps(map_inv_reg_run = TRUE)
+  #steps = repbox_fp_steps_base()
+  #set_ai_opts(model = "gemini-2.5-pro-exp-03-25")
+  repbox_run_fp(project_dir, steps,overwrite = TRUE,doc_type = "art")
+
+  rstudioapi::filesPaneNavigate(project_dir)
+
+    
   set_ai_opts(model = "gemini-2.5-pro-exp-03-25")
   set_ai_opts(model = "gemini-2.0-flash")
   steps = repbox_fp_steps_advanced()
@@ -53,8 +54,8 @@ example = function() {
   library(aikit)
   rgemini::set_gemini_api_key(file = "~/repbox/gemini/gemini_api_key.txt")
   set_ai_opts(model = "gemini-2.0-flash-thinking-exp")
-  set_ai_opts(model = "gemini-2.0-flash")
   set_ai_opts(model = "gemini-2.5-pro-exp-03-25")
+  set_ai_opts(model = "gemini-2.0-flash")
   parent_dir = "~/repbox/projects_share"
   project_dirs = repboxExplore::get_project_dirs("~/repbox/projects_share")
   repbox_rerun_outages(project_dirs,max_repeat = 5, sleep_sec = 30)
@@ -76,12 +77,12 @@ repbox_fp_steps_advanced = function() {
 }
 
 
-repbox_fp_steps = function(tab_given=FALSE, tab_notes_pdf=FALSE, tab_html_pdf=FALSE, tab_main=FALSE, ev_tab=FALSE, readme=FALSE, readme_overview=readme, readme_var=readme, readme_script_tab_fig = readme, readme_data=readme, tab_classify = FALSE, by_tab_classify = FALSE, by_tab_classify_nodoc=FALSE, map_reg_static = FALSE, reg_classify_static=FALSE) {
+repbox_fp_steps = function(tab_given=FALSE, tab_notes_pdf=FALSE, tab_html_pdf=FALSE, tab_main=FALSE, ev_tab=FALSE, readme=FALSE, readme_overview=readme, readme_var=readme, readme_script_tab_fig = readme, readme_data=readme, tab_classify = FALSE, by_tab_classify = FALSE, by_tab_classify_nodoc=FALSE, map_reg_static = FALSE, reg_classify_static=FALSE, map_reg_run=FALSE, map_inv_reg_run=FALSE) {
   as.list(sys.frame(sys.parent(0)))
 }
 
 
-repbox_fp_steps_from = function(tab_given=FALSE, tab_notes_pdf=tab_given, tab_html_pdf=tab_notes_pdf, tab_main=tab_html_pdf, ev_tab=tab_main, readme=ev_tab, readme_overview=readme, readme_var=readme, readme_script_tab_fig = readme, readme_data=readme, tab_classify = readme_data, by_tab_classify = tab_classify, by_tab_classify_nodoc=by_tab_classify, map_reg_static = by_tab_classify_nodoc, reg_classify_static=map_reg_static) {
+repbox_fp_steps_from = function(tab_given=FALSE, tab_notes_pdf=tab_given, tab_html_pdf=tab_notes_pdf, tab_main=tab_html_pdf, ev_tab=tab_main, readme=ev_tab, readme_overview=readme, readme_var=readme, readme_script_tab_fig = readme, readme_data=readme, tab_classify = readme_data, by_tab_classify = tab_classify, by_tab_classify_nodoc=by_tab_classify, map_reg_static = by_tab_classify_nodoc, reg_classify_static=map_reg_static, map_reg_run = reg_classify_static, map_inv_reg_run = map_reg_run) {
   as.list(sys.frame(sys.parent(0)))
 }
 
@@ -179,6 +180,36 @@ repbox_run_fp = function(project_dir, steps = repbox_fp_steps_from(TRUE), overwr
       proc_rai_pru(pru)
     }
   }
+  if (steps$map_reg_run) {
+    for (dt in doc_type) {
+      pru = 
+        rai_pru_base(project_dir, "map_reg_run", doc_type=dt, overwrite=overwrite) %>%
+        rai_pru_add_doc() %>%
+        rai_pru_add_tab_df() %>%
+        rai_pru_add_tab_media(in_context=FALSE) %>%
+        rai_pru_add_run_do(in_context = FALSE)
+      proc_rai_pru(pru)
+    }
+  }
+  if (steps$map_inv_reg_run) {
+    restore.point("proc_map_inv_reg_run")
+    for (dt in doc_type) {
+      pru = 
+        rai_pru_base(project_dir, "map_inv_reg_run", doc_type=dt, overwrite=overwrite) |>
+        rai_pru_add_reg_df()
+      # no regressions successfully run. we don't perform a mapping
+      if (NROW(pru[["reg_df"]])==0) {
+        next
+      }
+      pru = pru |>
+        rai_pru_add_doc() |>
+        rai_pru_add_tab_df() |>
+        rai_pru_add_tab_media(in_context=FALSE) |>
+        rai_pru_add_run_do(in_context = FALSE,only_reg_df_output = TRUE)
+      proc_rai_pru(pru)
+    }
+  }
+
   
 }
 

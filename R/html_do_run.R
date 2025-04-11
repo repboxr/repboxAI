@@ -5,7 +5,8 @@ example = function() {
   library(repboxTableTools)
   library(repboxAI)
   project_dir = "~/repbox/projects_share/aeri_1_2_6"
-  repbox_do_run_html(project_dir)
+  outfile = rai_media_run_do(project_dir)
+  rstudioapi::filesPaneNavigate(dirname(outfile))
 }
 
 
@@ -14,15 +15,22 @@ opts_do_run_html = function(do_max_runs=8000,line_max_runs=25,log_max_char=50000
   opts
 }
 
-repbox_do_run_html = function(project_dir, parcels = list(), opts=opts_do_run_html()) {
-  restore.point("repbox_do_run_html")
+rai_media_run_do = function(project_dir, parcels = list(), output_just_runid = NULL, opts=opts_do_run_html()) {
+  restore.point("rai_media_run_do")
   parcels = repdb_load_parcels(project_dir, c("stata_source", "stata_run_cmd", "stata_run_log","stata_cmd"), parcels=parcels)
   script_df = parcels$stata_source$script_source
   
   cmd_df = parcels$stata_cmd$stata_cmd %>% left_join(script_df %>% select(file_path, script_num), by="file_path")
   log_df = parcels$stata_run_log$stata_run_log
-  run_df = parcels$stata_run_cmd$stata_run_cmd %>%
+  run_df = parcels$stata_run_cmd$stata_run_cmd
+  
+  if (!is.null(output_just_runid)) {
+    log_df = log_df %>% filter(runid %in% output_just_runid)
+    run_df = run_df %>% filter(runid %in% output_just_runid)
+  }
+  run_df = run_df  %>%
     left_join(log_df %>% select(runid, logtxt), by="runid") %>%
+    left_join(script_df %>% select(file_path, script_num), by="file_path") %>%
     adapt_too_big_run_df(opts=opts)
   
   ldf = script_df %>%
@@ -37,15 +45,9 @@ repbox_do_run_html = function(project_dir, parcels = list(), opts=opts_do_run_ht
       #txt = htmltools::htmlEscape(txt)
     )
   
-  ldf = ldf %>%
-    left_join(select(cmd_df, orgline, line, is_reg, cmd, script_num), by=c("orgline","script_num"))
-  
-  cmd_df = tibble(orgline_start=c(1,5), orgline_end = c(3,5), line=c(1,5))
-  ldf = tibble(orgline =1:7)
   ldf = left_join(ldf,
-                  #select(cmd_df, orgline_start, orgline_end, line, is_reg, cmd, script_num),
-                  cmd_df,
-                  join_by(between(orgline,orgline_start,orgline_end))
+    select(cmd_df, orgline_start, orgline_end, line, is_reg, cmd, script_num),
+    join_by(script_num, between(orgline,orgline_start,orgline_end))
   )
   
   ldf = ldf %>%
@@ -59,47 +61,87 @@ repbox_do_run_html = function(project_dir, parcels = list(), opts=opts_do_run_ht
       orgline_end = max(orgline)
     )
   
-  ldf = ldf %>%
+  block_df = ldf %>%
     group_by(script_num, orgline_start, orgline_end, line) %>%
     summarize(
-      code_html = paste0('<pre class="do_code" data-script_num="', script_num,'" data-line="',orgline_start,'" data-line_end = "', orgline_end,'">\n',htmltools::htmlEscape(paste0(txt, collapse="\n"),'\n</pre>')
-                         
-      )
+      code_html = paste0('<pre class="do_code" script_num=', first(script_num),' line=',first(orgline_start),' line_end = ', first(orgline_end),'>\n',htmltools::htmlEscape(paste0(txt, collapse="\n")),'\n</pre>')
+    ) %>%
+    ungroup()
       
-      # Now we aggregate log on a line level
-      loli_df = run_df %>%
-        #left_join(run_df %>% select(runid, line, cmdline), by=c("runid")) %>%
-        mutate(
-          # correct weird log output
-          logtxt = ifelse(endsWith(trimws(cmdline),"{"), "", logtxt),
-          # reduce logtext that is too long
-          len_logtxt = nchar(logtxt),
-          logtxt = ifelse(is.true(len_logtxt > opts$log_max_char), paste0(substring(logtxt,1, opts$log_max_char), "\n... further output omitted ..."), logtxt)
-        ) %>%
-        left_join(cmd_df %>% select(line, orgline_start, script_num), by = c("line", "script_num") ) %>%
-        mutate(
-          #cmdline_html = paste0('<pre id="cmd-runid-',runid,'">', cmdline,"</pre>"),
-          log_html = paste0('<pre class="do_output" data-outputid="', runid,'" data-line="', orgline_start,'">',logtxt,'</pre>')
-        ) %>%
-        group_by(script_num, line, orgline_start) %>%
-        summarize(
-          log_html = paste0(log_html, collapse="\n")
-        )
-      
-      code_df = ldf %>%
-        left_join(loli_df, by = c("script_num","line")) %>%
-        mutate(
-          log_html = na_val(log_html, ""),
-          html = paste0(code_html, log_html)
-        )
-      
-      all_df = code_df %>%
-        group_by(script_num) %>%
-        summarize(
-          script_html = paste0('<h2 class="script_file">', first(file_path),'</h2><span class="script_num">script_num = ', first(script_num),'</span><br><div class="code_and_output">', paste0(html, collapse="\n"),"</div>")
-        )
-      
-      return(all_df$script_html)
+  # Now we aggregate log on a line level
+  loli_df = run_df %>%
+    #left_join(run_df %>% select(runid, line, cmdline), by=c("runid")) %>%
+    mutate(
+      # correct weird log output
+      logtxt = ifelse(endsWith(trimws(cmdline),"{"), "", logtxt),
+      # reduce logtext that is too long
+      len_logtxt = nchar(logtxt),
+      logtxt = ifelse(is.true(len_logtxt > opts$log_max_char), paste0(substring(logtxt,1, opts$log_max_char), "\n... further output omitted ..."), logtxt)
+    ) %>%
+    #left_join(cmd_df %>% select(line, script_num), by = c("line", "script_num") ) %>%
+    left_join(block_df %>% select(line, script_num, orgline_start), by = c("line", "script_num")) %>%
+    mutate(
+      log_html = paste0('\n<pre class="do_output" runid=', runid,' line="', orgline_start,'">\n',htmltools::htmlEscape(logtxt),'\n</pre>')
+    ) %>%
+    group_by(script_num, line) %>%
+    summarize(
+      log_html = paste0(log_html, collapse="\n")
+    )
+  
+  code_df = block_df %>%
+    left_join(loli_df, by = c("script_num","line")) %>%
+    mutate(
+      log_html = na_val(log_html, ""),
+      html = paste0(code_html, log_html)
+    )
+  
+  
+  all_df = code_df %>%
+    left_join(script_df %>% select(file_path, script_num), by="script_num") %>%
+    group_by(script_num) %>%
+    summarize(
+      script_html = paste0('<h2>Script <span class="script_num">', first(script_num), '</span>: <span class="script_file">', first(file_path),'</span></h2><br><div class="code_and_output">', paste0(html, collapse="\n"),"</div>")
+    )
+  
+  head_html = paste0(
+'<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Stata do files including output of successfully run code lines</title>
+<style>
+/* Base styling for all pre blocks */
+pre {
+  margin: 0px;
+  padding: 1px;
+  /*border-radius: 8px;*/
+  font-family: Consolas, Monaco, monospace;
+  /*line-height: 1.5;*/
+  overflow-x: auto;
+}
+
+/* Stata code blocks */
+.do_code {
+  margin: 1px;
+  background-color: #f0f8ff; /* soft blue */
+  position: relative;
+}
+
+/* Stata log output blocks */
+.do_output {
+  margin-left: 3em;
+  background-color: #f9f9f9; /* light gray */
+  position: relative;
+  color: #444;
+}
+</style>
+')
+  html = paste0(head_html, paste0(all_df$script_html, collapse="\n"), '</body></html>')
+  outdir = paste0(project_dir, "/fp/prompt_files")
+  if (!dir.exists(outdir)) dir.create(outdir, recursive = TRUE)
+  outfile = file.path(outdir, "do_run.html")
+  writeUtf8(html, outfile)
+  return(outfile)
 }
 
 

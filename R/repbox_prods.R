@@ -16,7 +16,8 @@ repbox_prods = function() {
   c(
     repbox_tab_prods(),
     repbox_readme_prods(),
-    repbox_map_prods()
+    repbox_map_prods(),
+    repbox_other_prods()
   )
 }
 
@@ -260,6 +261,21 @@ repbox_map_prods = function() {
   )
 }
 
+
+
+repbox_other_prods = function() {
+  prods_define(
+    prod_define(
+      "privacy_breach",
+      fields = list(
+        dataset     = schema_str("Exact name of the dataset (file or table)."),
+        variables   = schema_str("Comma‑separated list of variable names that, alone or jointly, create the privacy breach."),
+        explanation = schema_str("Brief justification of why these variables constitute a breach."),
+        risk_level  = schema_str("Severity of the breach: must be one of 'low', 'moderate', or 'high'.", enum=c("low","moderate","high"))
+      )
+    )
+  )  
+}
 
 
 

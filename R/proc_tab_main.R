@@ -27,8 +27,6 @@ proc_tab_main = function(project_dir, ver_ind = 0, overwrite=TRUE) {
   ver_dirs = fp_all_ver_dirs(fp_dirs, "tab_notes", ver_ind=ver_ind)
   notes_df = tibble(notes_ver_dir = ver_dirs, proc_id = fp_ver_dir_to_proc_id(ver_dirs),  fp_dir = fp_ver_dir_to_fp_dir(ver_dirs))
   
-   
-  
   # 1. Create tab main for processes which are expected to use their own note extraction
   sel_df = html_df %>% 
     filter(startsWith(proc_id, "pdf-") | proc_id %in% c("html","pdf_txt")) %>%

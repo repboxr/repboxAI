@@ -23,7 +23,7 @@ example = function() {
 }
 
 proc_tab_given = function(project_dir, to_v0=TRUE, doc_form=NULL, doc_type=NULL) {
-  restore.point("proc_tab_hx")
+  restore.point("proc_tab_given")
   doc_dirs = repboxDoc::repbox_doc_dirs(project_dir,doc_form = doc_form, doc_type=doc_type)
   doc_dir = first(doc_dirs)
   for (doc_dir in doc_dirs) {
@@ -35,8 +35,18 @@ proc_doc_tab_given = function(doc_dir, to_v0=TRUE) {
   restore.point("proc_doc_tab_given")
   prod_id = "tab_main"; prod = repbox_prod(prod_id)
   doc_form = rdoc_form(doc_dir)
+  
+  # Creates page_df.Rds, parts_df.Rds, tabs_df.Rds etc
+  # if already exists skips
+  rdoc_process(doc_dir,overwrite=FALSE)
+  
+  rdoc_is_processed(doc_dir)
+  
+  
   df = readRDS.or.null(file.path(doc_dir, "tab_df.Rds"))
 
+  if (NROW(df)==0) return(NULL)
+  
   just_raw=FALSE
   proc_id = doc_form
   if (doc_form=="html") {
@@ -81,3 +91,19 @@ proc_doc_tab_given = function(doc_dir, to_v0=TRUE) {
   #rstudioapi::filesPaneNavigate(pru$ver_dir)
   invisible(pru)
 }
+
+# rdoc_process instead
+# 
+# # Think of what should be called by make_ejd
+# rdoc_prepare_hx = function(doc_dir) {
+#   doc_form = rdoc_form(doc_dir)
+#   if (doc_form=="mocr") {
+#     repboxDoc::rdoc_mocr_process(doc_dir)
+#   } else if (doc_form == "pdf") {
+#     rdoc_pdf_to_txt_pages(doc_dir)
+#     rdoc_pdf_pages_to_parts(doc_dir)
+#     rdoc_pdf_extract_tabs(doc_dir)
+#   } else if (doc_form == "html") {
+#     rdoc_html_to_parts(doc_dir) 
+#   }
+# }

@@ -1,3 +1,38 @@
+repbox_default_fp_analysis = function(project_dir) {
+  library(repboxAI)
+  library(aikit)
+  project_dir = "/home/rstudio/repbox/projects_gha_new/aejapp_1_2_4"
+  if (FALSE)
+    rstudioapi::filesPaneNavigate(project_dir)
+  
+  rgemini::set_gemini_api_key(file = "~/repbox/gemini/gemini_api_key.txt")
+  
+  steps_all = repbox_fp_steps_from(tab_given=TRUE)
+  steps_hx = repbox_fp_steps(tab_given=TRUE)
+  steps2.0 = repbox_fp_steps_from(tab_notes_pdf = TRUE, ev_tab=FALSE)
+  steps2.5 = repbox_fp_steps_from(ev_tab=TRUE)
+  
+  repbox_run_fp(project_dir,steps_hx, overwrite = FALSE)
+
+  set_ai_opts(model = "gemini-2.5-flash-lite-preview-06-17")
+  repbox_run_fp(project_dir,steps2.0, overwrite = FALSE)
+
+  
+  set_ai_opts(model = "gemini-2.0-flash")
+  repbox_run_fp(project_dir,steps2.0, overwrite = FALSE)
+  
+  
+  
+  set_ai_opts(model = "gemini-2.5-flash")
+  repbox_run_fp(project_dir,steps2.5, overwrite = FALSE)
+  
+  set_ai_opts(model = "gemini-2.5-flash-lite-preview-06-17")
+  repbox_run_fp(project_dir,steps2.5, overwrite = FALSE)
+    
+  repbox_rerun_outages(project_dir,steps = steps_all,max_repeat = 5, sleep_sec = 30)
+}
+
+
 example = function() {
   #ai_clear_cache()
   library(repboxAI)
@@ -34,8 +69,13 @@ example = function() {
   set_ai_opts(model = "gemini-2.5-pro-exp-03-25")
   
   parent_dir = "~/repbox/projects_share"
+  steps2.0 = repbox_fp_steps_from(tab_given=TRUE, ev_tab=FALSE)
+  steps2.5 = repbox_fp_steps_from(ev_tab=TRUE)
+  
+  
   steps = repbox_fp_steps(map_reg_static = TRUE)
   steps = repbox_fp_steps(reg_classify_static = TRUE)
+  steps = repbox_fp_steps(tab_given = TRUE)
   project_dirs = repboxExplore::get_project_dirs("~/repbox/projects_share")
   #project_dir = project_dirs[1]
   for (project_dir in project_dirs) {
@@ -75,6 +115,8 @@ repbox_fp_steps_base = function() {
 repbox_fp_steps_advanced = function() {
   repbox_fp_steps_from(map_reg_static = TRUE)
 }
+
+
 
 
 repbox_fp_steps = function(tab_given=FALSE, tab_notes_pdf=FALSE, tab_html_pdf=FALSE, tab_main=FALSE, ev_tab=FALSE, readme=FALSE, readme_overview=readme, readme_var=readme, readme_script_tab_fig = readme, readme_data=readme, tab_classify = FALSE, by_tab_classify = FALSE, by_tab_classify_nodoc=FALSE, map_reg_static = FALSE, reg_classify_static=FALSE, map_reg_run=FALSE, map_inv_reg_run=FALSE) {

@@ -1,7 +1,10 @@
+
+
 repbox_default_fp_analysis = function(project_dir) {
   library(repboxAI)
   library(aikit)
   project_dir = "/home/rstudio/repbox/projects_gha_new/aejapp_1_2_4"
+  
   if (FALSE)
     rstudioapi::filesPaneNavigate(project_dir)
   
@@ -108,6 +111,15 @@ example = function() {
   
 }
 
+repbox_fp_join_steps = function(...) {
+  step_li = list(...)
+  restore.point("repbox_fp_join_steps")
+  steps = do.call(c,step_li)
+  all_steps = c(repbox_fp_steps_from(), repbox_fp_readme_steps_from())
+  all_steps[names(steps)] = steps
+  all_steps
+}
+
 repbox_fp_steps_base = function() {
   repbox_fp_steps_from(tab_given=TRUE,by_tab_classify = FALSE)
 }
@@ -116,20 +128,27 @@ repbox_fp_steps_advanced = function() {
   repbox_fp_steps_from(map_reg_static = TRUE)
 }
 
+repbox_fp_readme_steps_from = function(readme_overview=FALSE, readme_var=readme_overview, readme_script_tab_fig = readme_var, readme_data=readme_script_tab_fig, readme_vs_guide=readme_data) {
+  as.list(sys.frame(sys.parent(0)))  
+}
 
+repbox_fp_readme_steps = function(readme=FALSE, readme_overview=FALSE, readme_var=FALSE, readme_script_tab_fig = FALSE, readme_data=FALSE, readme_vs_guide=FALSE) {
+  as.list(sys.frame(sys.parent(0)))  
+}
 
-
-repbox_fp_steps = function(tab_given=FALSE, tab_notes_pdf=FALSE, tab_html_pdf=FALSE, tab_main=FALSE, ev_tab=FALSE, readme=FALSE, readme_overview=readme, readme_var=readme, readme_script_tab_fig = readme, readme_data=readme, tab_classify = FALSE, by_tab_classify = FALSE, by_tab_classify_nodoc=FALSE, map_reg_static = FALSE, reg_classify_static=FALSE, map_reg_run=FALSE, map_inv_reg_run=FALSE) {
+repbox_fp_steps = function(tab_given=FALSE, tab_notes_pdf=FALSE, tab_html_pdf=FALSE, tab_main=FALSE, ev_tab=FALSE, tab_classify = FALSE, by_tab_classify = FALSE, by_tab_classify_nodoc=FALSE, map_reg_static = FALSE, reg_classify_static=FALSE, map_reg_run=FALSE, map_inv_reg_run=FALSE) {
   as.list(sys.frame(sys.parent(0)))
 }
 
 
-repbox_fp_steps_from = function(tab_given=FALSE, tab_notes_pdf=tab_given, tab_html_pdf=tab_notes_pdf, tab_main=tab_html_pdf, ev_tab=tab_main, readme=ev_tab, readme_overview=readme, readme_var=readme, readme_script_tab_fig = readme, readme_data=readme, tab_classify = readme_data, by_tab_classify = tab_classify, by_tab_classify_nodoc=by_tab_classify, map_reg_static = by_tab_classify_nodoc, reg_classify_static=map_reg_static, map_reg_run = reg_classify_static, map_inv_reg_run = map_reg_run) {
+repbox_fp_steps_from = function(tab_given=FALSE, tab_notes_pdf=tab_given, tab_html_pdf=tab_notes_pdf, tab_main=tab_html_pdf, ev_tab=tab_main,  tab_classify = ev_tab, by_tab_classify = tab_classify, by_tab_classify_nodoc=by_tab_classify, map_reg_static = by_tab_classify_nodoc, reg_classify_static=map_reg_static, map_reg_run = reg_classify_static, map_inv_reg_run = map_reg_run) {
   as.list(sys.frame(sys.parent(0)))
 }
 
 repbox_run_fp = function(project_dir, steps = repbox_fp_steps_from(TRUE), overwrite=FALSE, overwrite_hx = overwrite, doc_type = NULL) {
   restore.point("repbox_run_fp")
+  org_steps = steps
+  steps = repbox_fp_join_steps(steps)
   all_doc_types = repbox_doc_types(project_dir)
   if (!is.null(doc_type)) {
     doc_type = intersect(doc_type, all_doc_types)
@@ -166,6 +185,9 @@ repbox_run_fp = function(project_dir, steps = repbox_fp_steps_from(TRUE), overwr
   }
   if (steps$readme_data) {
     proc_readme(project_dir,"readme_data", overwrite=overwrite)
+  }
+  if (steps$readme_vs_guide) {
+    proc_readme(project_dir,"readme_vs_guide", overwrite=overwrite)
   }
 
   if (steps$tab_classify) {
@@ -271,19 +293,22 @@ repbox_error_ver_dirs = function(project_dirs, steps = repbox_fp_steps_from(TRUE
   ver_dirs
 } 
 
+repbox_fp_steps_to_names = function(steps) {
+  names(steps[unlist(steps)])
+}
 
 repbox_outage_ver_dirs = function(project_dirs, steps = repbox_fp_steps_from(TRUE)) {
   restore.point("repbox_outage_ver_dirs")
   parent_dirs = file.path(project_dirs, "fp") 
+  step_names = repbox_fp_steps_to_names(steps)
   ver_dirs = NULL
+  ver_dirs = union(ver_dirs, fp_all_outage_ver_dirs(parent_dirs, step_names))
+  
   if (steps$tab_notes_pdf) {
     ver_dirs = union(ver_dirs, fp_all_outage_ver_dirs(parent_dirs, "tab_notes"))
   }
   if (steps$tab_html_pdf) {
     ver_dirs = union(ver_dirs, fp_all_outage_ver_dirs(parent_dirs, "tab_html"))
-  }
-  if (steps$readme) {
-    ver_dirs = union(ver_dirs, fp_all_outage_ver_dirs(parent_dirs,c( "readme_overview","readme_var", "readme_script_tab_fig","readme_data","readme_data_descr")))
   }
   if (steps$tab_classify | steps$by_tab_classify | steps$by_tab_classify_nodoc) {
     ver_dirs = union(ver_dirs, fp_all_outage_ver_dirs(parent_dirs, "tab_classify"))
@@ -293,6 +318,7 @@ repbox_outage_ver_dirs = function(project_dirs, steps = repbox_fp_steps_from(TRU
 
 repbox_rerun_outages = function(project_dirs, steps = repbox_fp_steps_from(TRUE), max_repeat=0, sleep_sec = 30) {
   restore.point("repbox_rerun_outages")
+  steps = repbox_fp_join_steps(steps)
   ver_dirs = repbox_outage_ver_dirs(project_dirs, steps)
   cat(paste0("\n", length(ver_dirs), " outages found.\n\n"))
   if (length(ver_dirs)==0) return(NULL)

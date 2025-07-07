@@ -9,9 +9,17 @@ JSON RESPONSE SCHEMA:
   "items": {
     "type": "object",
     "properties": {
+      "readme_file": {
+        "type": "string",
+        "description": "The name of the readme file."
+      },
       "dataset_file": {
         "type": "string",
-        "description": "Name of the data set."
+        "description": "Name of the data set. If a concrete file name is mentioned use that file name with extension. Sometimes the rows of a larger data set are distrbuted over several files with similar naming convetions. E.g. files like pop_de.csv, pop_fr.csv, pop_uk.csv, ... which all contain population data for a different country. In that case list up to three data set files from the larger data set as a comma separated list and add the glob pattern that matches all files in the next field dataset_file_glob."
+      },
+      "dataset_file_glob": {
+        "type": "string",
+        "description": "Only relevant if the data set rows are distributed over several files with similar naming convention. Then write down the glob pattern that matches all files. E.g. if the data set is in a set of files like pop_de.csv, pop_fr.csv, pop_uk.csv, ... which all contain population data for a different country. Write pop_*.csv. If not relevant, write just an empty string."
       },
       "dataset_descr": {
         "type": "string",
@@ -22,7 +30,7 @@ JSON RESPONSE SCHEMA:
         "description": "If the README provides any information on the data set source, please state the source here."
       },
       "is_included": {
-        "type": "bool",
+        "type": ["bool", "null"],
         "description": "TRUE if the README says that the data set is included in the reproduction package. FALSE if the README states that the data set is not included, e.g. because it is proprietary. If not info is given, set to null."
       },
       "instructions_how_to_obtain_data": {
@@ -35,11 +43,11 @@ JSON RESPONSE SCHEMA:
       },
       "table_names": {
         "type": "string",
-        "description": "If the README describes that the data set is used to generate certain tables in the article, please list all thoise tables as a comma separated list, e.g. 'Table 2, Table 3, Table A1.' If nothing is stated leave the field empty."
+        "description": "If the README describes that the data set is used to generate certain tables in the article, please list all thoise tables as a comma separated list, e.g. 'Table 2, Table 3, Table A1.' If nothing is explicitly stated just write an empty string. "
       },
       "figure_names": {
         "type": "string",
-        "description": "If the README describes that the data set is used to generate certain figures in the article, please list all thoise tables as a comma separated list, e.g. 'Figure 1, Figure 5'. If nothing is stated, leave the field empty."
+        "description": "If the README describes that the data set is used to generate certain figures in the article, please list all thoise tables as a comma separated list, e.g. 'Figure 1, Figure 5'. If nothing is explicitly stated just write an empty string."
       },
       "data_country": {
         "type": "string",
@@ -105,6 +113,10 @@ JSON RESPONSE SCHEMA:
       "id_time_dimension": {
         "type": "string",
         "description": "For time series or panel data sets can you infer from the README which variables are ID variables for the time dimension (e.g. year, month, t, period) and write it down?"
+      },
+      "analyst_notes": {
+        "type": "string",
+        "description": "Any other relevant information, context, or ambiguities noted in the README file regarding this dataset. Be brief. Analyst notes can often remain empty."
       }
     }
   }

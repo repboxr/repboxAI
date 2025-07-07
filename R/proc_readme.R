@@ -27,7 +27,7 @@ example = function() {
 }
 
 #' Extracts tab_html from articles
-proc_readme = function(project_dir, prod_id = c("readme_overview","readme_var","readme_tabfig")[1], ai_opts = get_ai_opts(), verbose=TRUE, to_v0=TRUE, use_schema = FALSE, overwrite=TRUE) {
+proc_readme = function(project_dir, prod_id = c("readme_overview","readme_var","readme_tabfig")[1], ai_opts = get_ai_opts(), verbose=TRUE, to_v0=TRUE, use_schema = FALSE, overwrite=TRUE, max_readme_rank=1) {
   restore.point("proc_readme")
   library(repboxReadme)
   readme_df = repbox_load_or_make_readme_ranks(project_dir)
@@ -35,7 +35,7 @@ proc_readme = function(project_dir, prod_id = c("readme_overview","readme_var","
     cat("\nNo readme files found for ", project_dir, ".\n")
     return(NULL)
   }
-  readme_df = readme_df %>% filter(!ignore)
+  readme_df = readme_df %>% filter(!ignore) %>% filter(rank <= max_readme_rank)
   fp_dir = file.path(project_dir, "fp", "readme") 
   
   tpl_file = file.path(rai_tpl_dir(), paste0(prod_id,".txt"))
@@ -44,6 +44,7 @@ proc_readme = function(project_dir, prod_id = c("readme_overview","readme_var","
   
   pru = pru_init(fp_dir,prod_id,proc_info=proc_info,to_v0=to_v0)
   
+  pru$max_readme_rank = max_readme_rank
   pru$readme_df = readme_df
   pru$project_dir = project_dir
   if (!overwrite) if (fp_ver_dir_ok(pru$ver_dir)) return(NULL)

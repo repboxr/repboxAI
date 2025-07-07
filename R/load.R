@@ -1,3 +1,13 @@
+rai_agg_all_prod_df = function(projects_dir, prod_id) {
+  restore.point("rai_agg_all_prod_df")
+  df = FuzzyProduction::fp_load_all_prod_df(projects_dir,prod_id, add_ver_dir=TRUE)
+  df$project_dir = str.left.of(df$ver_dir,"/fp/")
+  df$artid = basename(df$project_dir)
+  df = df[, union("artid", names(df))]
+  df
+}
+
+
 rai_file_cache = function(...) {
   new.env(parent=emptyenv())
 }

@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "properties": {
+    "tabid": {
+      "type": "string",
+      "maxLength": 10
+    },
+    "otabid": {
+      "type": "string"
+    },
+    "tabtitle": {
+      "type": "string",
+      "maxLength": 400
+    },
+    "tabhtml": {
+      "type": "string"
+    },
+    "tabnotes": {
+      "type": "string",
+      "maxLength": 2000
+    }
+  }
+}

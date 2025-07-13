@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "properties": {
+    "readme_file": {
+      "type": "string",
+      "description": "The name of the readme file."
+    },
+    "script_file": {
+      "type": "string",
+      "description": "Filename of the script"
+    },
+    "table_names": {
+      "type": "string",
+      "description": "Name of the table or tables that according to the README file are wholly or partially created by the script given in script_file. If the script creates multiple tables, write a comma separated list, e.g. 'Table 1, Table 3, Table A2.'"
+    },
+    "figure_names": {
+      "type": "string",
+      "description": "Name of the figure or figures that according to the README file are wholly or partially created by the script. If the script creates multiple figures, write a comma separated list, e.g. 'Figure 2, Figure 5'"
+    }
+  }
+}

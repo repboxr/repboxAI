@@ -10,6 +10,18 @@ example = function() {
   prod_to_json_schema(prod, "obj",allow_null_def = TRUE)
   prod = repbox_prod("readme_data")
   prod_to_json_schema(prod, "arr",allow_null_def = FALSE)
+  
+  
+  # write all json schemas so they 
+  # can be used in AI prompts
+  prods = repbox_prods()
+  i = 1
+  for (i in seq_along(prods)) {
+    prod_name = names(prods[i])
+    file = paste0("~/repbox/gemini/repboxAI/inst/prod_schemas/", prod_name, ".json")
+    json = prod_to_json_schema(prods[[i]], "obj",, allow_null_def = FALSE)
+    writeLines(json, file)  
+  }
 }
 
 repbox_prod = function(pid, prods = repbox_prods()) {
@@ -267,19 +279,25 @@ repbox_map_prods = function() {
       tabid = schema_str("The table ID as stated in the list of tables above."),
       reg_ind = schema_int("A counter that provides a uniqe integer number for each regression that you have identified across all tables. Start with 1 and increment for each regression."),
       cell_ids = schema_str("A comma separated list of all cell ids of those cells in the HTML version of the table that correspond to this specific regression and whose value was computed by the specified code line and correspond to the specified output. E.g. for a table with tabid='2', this comma separated string of cell ids might look like 'c2_10,c2_12,c2_14'. Each cell id can be found as the 'id' tag of the corresponding <td> or <th> element of the HTML version of the article's table. Only add cells that show numeric results, e.g. estimated coefficient, or number of observations, but no title cells or cells showing variable labels. Some tables in articles are structured such that some descriptive statistics, like the number of observations are shown on the bottom of a column and apply to multiple regressions shown in that column. Add the corresponding cell id for every regression, that they apply to."),
-      script_num = schema_int("The number of the script file that contains the code corresponding to the particular regression shown in the table. The script number is given in the 'script_num' attribute of the <pre> elements showing the stata code.", allow_null=TRUE),
-      script_file = schema_str("The corresponding name of the script file, as listed in the list of script files above.", allow_null=TRUE),
-      code_line = schema_int("The code line of the regression command in the mapped script file, corresponding to the particular regression shown in the table. Use the line number as stated in the 'line' attribute of the corresponding <pre> element. For commands spaning more than one line, that is the first code line.", allow_null=TRUE),
-      runid = schema_int("If the code line was successfully run and one or several outputs are provided in the HTML file containing code and log. Each output is identified with a unique `runid` shown in the 'runid' attribute of the corrresponding <pre> element. Write down here the runid corresponding to this regression.", allow_null=TRUE),
-      ran_correctly = schema_bool("If you could match to the regression the output of a run regression command specified by the runid. Did the regression command run correctly in Stata and is a typical regression output shown? Set to false if the regression seems not to have been correctly run, e.g. due to missing data or a missing column. Then no typical regression output is shown in the Stat code."),
-      problem = schema_str("Did you encounter a problem related to this mapping? If yes describe it here. Typically this field will be empty. Only write something if there is an important problem that substantially hampers this mapping task.", allow_null = TRUE),
-      output = schema_str("If you mapped the output of a run Stata command please show here the content of that ouput shown in the <pre> element.", allow_null = TRUE)
+      runid = schema_int("The unique runid identifying the regression output in the script file. If no output chunk is provided for the regression or post regression command, set null.", allow_null=TRUE),
+      script_file = schema_str("The corresponding name of the Stata script file.", allow_null=TRUE),
+      script_num = schema_int("The number of the script file, map the script file name to the script_num shown in the table of Stata scripts in the prompt.", allow_null=TRUE),
+      code_line = schema_int("The code line of the regression command in the script file.", allow_null=TRUE),
+      wrong_number_cases = schema_arr(descr = "Sometimes, but quite rarely, there was a transcription error when the article was written such that one or multiple numbers shown in the regression table don't correspond to the actual numbers computed by the Stata command in the replication package. If you find such cases for the current regression, note them in this array. Don't note cases where numbers between the Stata output and table only differ because they are rounded to a different number of digits or formatted differently, which is very common and no problem. Usually all numbers are transcribed correctly and this array will be empty.", items=schema_obj(
+        properties = list(
+          cell_id = schema_str("The cell_id of the table cell showing the wrong number, e.g. 'c2_10'"),
+          wrong_number_in_cell = schema_num("The wrong number shown in the cell. Ignore special formating and just write down the numeric value."),
+          number_in_stata_output = schema_num("The actual number shown in the output of the Stata regression.")
+        )
+      )),
+      problem = schema_str("Did you encounter a problem related to this mapping? If yes describe it here. Typically this field will be empty. Only write something if there is an important problem that substantially hampers this mapping task.", allow_null = TRUE)
     )),
     prod_define("map_inv_reg_run",list(
-      runid = schema_int("The unique runid of the regression as stated in the table above. It is also given as 'runid' attribute in the corresponding <pre> element in the HTML file of the stata code that shows the regression output."),
-      script_num = schema_int("The number of the script file that contains the code corresponding to the particular regression shown in the table. The number is given in the 'script_num' attribute of the <pre> elements showing the stata code."),
-      script_file = schema_str("The corresponding name of the script file, as listed in the list of script files above."),
-      code_line = schema_int("The code line of the regression command in the mapped script file, corresponding to the particular regression shown in the table. Use the line number as stated in the 'line' attribute of the corresponding <pre> element. For commands spaning more than one line, that is the first code line."),
+      runid = schema_int("The unique runid of the regression as stated in the table above. It is also shown in title of the corresponding output chunk of the text file containing all Stata scripts with regression outputs."),
+      script_file = schema_str("The name of the Stata script file that contains the regression."),
+      script_num = schema_int("The corresponding number of the script file as shown in the table of all Stata scripts in the prompt."),
+
+      code_line = schema_int("The code line of the regression command in its Stata script. For regression commands spaning more than one line, use the first code line."),
       tabid = schema_str("If you can map the regression to a particular table shown in the list above, state here the corresponding tabid. Otherwise set null.", allow_null = TRUE),
       figid = schema_str("If the regression is used to generate a particular figure in article or appendix, please note here the figure id. For example, if a figure is called 'Figure 5' the figid would be just '5', if a figure is called 'Fugure A.1' the figid would be 'A.1'.", allow_null = TRUE),
       cell_ids = schema_str("Relevant if the run regression can be mapped to particular table. A comma separated list of all cell ids of those cells in the HTML version of the table that correspond to the specific run regression. E.g. for a table with tabid='2', this comma separated string of cell ids might look like 'c2_10,c2-12,c2-14'. Each cell id can be found as the 'id' tag of the corresponding <td> or <th> element of the HTML version of the article's tables. Only add cells that show numeric results, e.g. estimated coefficient, or number of observations, but no title cells or cells showing variable labels. Some tables in articles are structured such that some descriptive statistics, like the number of observations are shown on the bottom of a column and apply to multiple regressions shown in that column. Add the corresponding cell id for every regression, that they apply to."),

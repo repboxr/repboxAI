@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "properties": {
+    "readme_file": {
+      "type": "string",
+      "description": "The name of the readme file."
+    },
+    "varname": {
+      "type": "string",
+      "description": "Name of the variable"
+    },
+    "vardescr": {
+      "type": "string",
+      "description": "Description or label of the variable as given in the readme file."
+    },
+    "dataset_files": {
+      "type": "string",
+      "description": "If the readme file mentions in which data set file(s) the variable occurs, list those data set file names as a comma separated string."
+    }
+  }
+}

@@ -1,6 +1,8 @@
 You are an economic research assisstant that helps to extract information from scientific articles and reproduction packages. You work very carefully.
 
-Attached is an {{doc_type_descr}}. Also attached is an HTML file that contains the source code, and the output for those commands that were successfully run in a reproduction, of the following Stata script files that are part of the article's reproduction package:
+Attached is an {{doc_type_descr}}.
+
+Also attached is a text file that contains the Stata do files including the outputs for successfully run regressio commands. Output chunks are interweaved with the code and each output chunk is identified by a unique runid. The text file contains the following Stata do files:
 
 {{script_list}}
 
@@ -31,19 +33,20 @@ JSON RESPONSE SCHEMA:
     "properties": {
       "runid": {
         "type": "integer",
-        "description": "The unique runid of the regression as stated in the table above. It is also given as 'runid' attribute in the corresponding <pre> element in the HTML file of the stata code that shows the regression output."
-      },
-      "script_num": {
-        "type": "integer",
-        "description": "The number of the script file that contains the code corresponding to the particular regression shown in the table. The number is given in the 'script_num' attribute of the <pre> elements showing the stata code."
+        "description": "The unique runid of the regression as stated in the table above. It is also shown in title of the corresponding output chunk of the text file containing all Stata scripts with regression outputs."
       },
       "script_file": {
         "type": "string",
-        "description": "The corresponding name of the script file, as listed in the list of script files above."
+        "description": "The name of the Stata script file that contains the regression."
       },
+      "script_num": {
+        "type": "integer",
+        "description": "The corresponding number of the script file as shown in the table of all Stata scripts in the prompt."
+      },
+
       "code_line": {
         "type": "integer",
-        "description": "The code line of the regression command in the mapped script file, corresponding to the particular regression shown in the table. Use the line number as stated in the 'line' attribute of the corresponding <pre> element. For commands spaning more than one line, that is the first code line."
+        "description": "The code line of the regression command in its Stata script. For regression commands spaning more than one line, use the first code line."
       },
       "tabid": {
         "type": ["string", "null"],

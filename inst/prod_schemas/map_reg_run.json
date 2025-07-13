@@ -1,0 +1,37 @@
+{
+  "type": "object",
+  "properties": {
+    "tabid": {
+      "type": "string",
+      "description": "The table ID as stated in the list of tables above."
+    },
+    "reg_ind": {
+      "type": "integer",
+      "description": "A counter that provides a uniqe integer number for each regression that you have identified across all tables. Start with 1 and increment for each regression."
+    },
+    "cell_ids": {
+      "type": "string",
+      "description": "A comma separated list of all cell ids of those cells in the HTML version of the table that correspond to this specific regression and whose value was computed by the specified code line and correspond to the specified output. E.g. for a table with tabid='2', this comma separated string of cell ids might look like 'c2_10,c2_12,c2_14'. Each cell id can be found as the 'id' tag of the corresponding <td> or <th> element of the HTML version of the article's table. Only add cells that show numeric results, e.g. estimated coefficient, or number of observations, but no title cells or cells showing variable labels. Some tables in articles are structured such that some descriptive statistics, like the number of observations are shown on the bottom of a column and apply to multiple regressions shown in that column. Add the corresponding cell id for every regression, that they apply to."
+    },
+    "runid": {
+      "type": ["integer", "null"],
+      "description": "The unique runid identifying the regression output in the script file. If no output chunk is provided for the regression or post regression command, set null."
+    },
+    "script_file": {
+      "type": ["string", "null"],
+      "description": "The corresponding name of the Stata script file."
+    },
+    "script_num": {
+      "type": ["integer", "null"],
+      "description": "The number of the script file, map the script file name to the script_num shown in the table of Stata scripts in the prompt."
+    },
+    "code_line": {
+      "type": ["integer", "null"],
+      "description": "The code line of the regression command in the script file."
+    },
+    "problem": {
+      "type": ["string", "null"],
+      "description": "Did you encounter a problem related to this mapping? If yes describe it here. Typically this field will be empty. Only write something if there is an important problem that substantially hampers this mapping task."
+    }
+  }
+}

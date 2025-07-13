@@ -141,7 +141,7 @@ repbox_fp_steps = function(tab_given=FALSE, tab_notes_pdf=FALSE, tab_html_pdf=FA
 }
 
 
-repbox_fp_steps_from = function(tab_given=FALSE, tab_notes_pdf=tab_given, tab_html_pdf=tab_notes_pdf, tab_main=tab_html_pdf, ev_tab=tab_main,  tab_classify = ev_tab, by_tab_classify = tab_classify, by_tab_classify_nodoc=by_tab_classify, map_reg_static = by_tab_classify_nodoc, reg_classify_static=map_reg_static, map_reg_run = reg_classify_static, map_inv_reg_run = map_reg_run) {
+repbox_fp_steps_from = function(tab_given=FALSE, tab_notes_pdf=tab_given, tab_html_pdf=tab_notes_pdf, tab_main=tab_html_pdf, ev_tab=tab_main,  tab_classify = ev_tab, by_tab_classify = FALSE, by_tab_classify_nodoc=FALSE, map_reg_static = by_tab_classify_nodoc | tab_classify, reg_classify_static=map_reg_static, map_reg_run = reg_classify_static, map_inv_reg_run = map_reg_run) {
   as.list(sys.frame(sys.parent(0)))
 }
 

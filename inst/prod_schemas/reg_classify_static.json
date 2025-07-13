@@ -1,0 +1,73 @@
+{
+  "type": "object",
+  "properties": {
+    "tabid": {
+      "type": "string",
+      "description": "The table ID as stated in the list of regressions above."
+    },
+    "reg_ind": {
+      "type": "integer",
+      "description": "The regression index as stated in the field 'reg_ind' in the list of regressions shown above."
+    },
+    "short_descr": {
+      "type": "string",
+      "description": "A short description of what the regression analyzes based on the information in the article."
+    },
+    "is_did_reg": {
+      "type": "bool",
+      "description": "true if the regression performs a difference-in-difference (DID) analysis."
+    },
+    "is_rdd_reg": {
+      "type": "bool",
+      "description": "true if the regression performs a regression discontinuity design (RDD) analysis."
+    },
+    "is_iv_reg": {
+      "type": "bool",
+      "description": "true if it is an instrumental varibale regression"
+    },
+    "is_iv_first_stage_reg": {
+      "type": "bool",
+      "description": "true if the shown regression results correspond to the first stage regression of an instrumental variable regression (in the script the command could be an iv regression with the option to show first stage results or it could be a separate OLS first stage regression)"
+    },
+    "is_placebo_test": {
+      "type": "bool",
+      "description": "true if the regression performs a placebo test, or a similar permutation test."
+    },
+    "is_pref_spec_in_tab": {
+      "type": "bool",
+      "description": "Often tables show multiple regression specifications and sometimes the authors state which specification is their preferred specification. Set true if this regression is the preferred specification  among the specifications shown in the table."
+    },
+    "is_main_result": {
+      "type": "bool",
+      "description": "true if the regression results are described as main results of the article (compared to robustness checks or additional results)"
+    },
+    "is_additional_result": {
+      "type": "bool",
+      "description": "true if the regression shows additional results that are not described as main results of the article"
+    },
+    "is_robustness_check": {
+      "type": "bool",
+      "description": "true if the regression is mainly a robustness check for other results."
+    },
+    "label_dep_var": {
+      "type": "string",
+      "description": "Based on the information in the article and table find a suitable label for the dependent variable in the regression."
+    },
+    "labels_coef_of_interest": {
+      "type": "string",
+      "description": "Often regression tables show both coefficients of primary interest for the analysis and coefficients for control variables that are not of primary interest. Sometimes only coefficient of primary interest are shown. Please state the variable lables of the coefficients of primary interest for this regression as shown in the table. If there are multiple variables of primary interest your string shall be a comma separted list, e.g. 'age,gender'."
+    },
+    "cell_id_coef_of_interest": {
+      "type": "string",
+      "description": "Please state the cell ids of all cells for this regression that show the numeric value of the  coefficient of interests or their standard error / p-value / t-value. Return a comma separated list of all those cell_ids, like 'c2_10,c2-12'."
+    },
+    "analyses_heterogeneity": {
+      "type": "bool",
+      "description": "true if the  cofficient of interest of the regressions analyze heterogenous effects, e.g. if the regression provided information on how treatment effect sizes differ between subgroups."
+    },
+    "error_in_prompt_or_media": {
+      "type": "string",
+      "description": "Is there some inconsistency in the prompt or the attached media files, e.g. the media don't show the tables listed in the prompt etc. This could be an indicator for some error in my pipeline. If such an inconsistency exists, briefly describe it only for the first regression. If all seems ok, set to an empty string. In later regressions always set to an empty string."
+    }
+  }
+}

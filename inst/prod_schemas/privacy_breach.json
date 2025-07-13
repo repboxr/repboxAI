@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "properties": {
+    "dataset": {
+      "type": "string",
+      "description": "Exact name of the dataset (file or table)."
+    },
+    "variables": {
+      "type": "string",
+      "description": "Comma‑separated list of variable names that, alone or jointly, create the privacy breach."
+    },
+    "explanation": {
+      "type": "string",
+      "description": "Brief justification of why these variables constitute a breach."
+    },
+    "risk_level": {
+      "type": "string",
+      "description": "Severity of the breach: must be one of 'low', 'moderate', or 'high'.",
+      "enum": ["low", "moderate", "high"]
+    }
+  }
+}

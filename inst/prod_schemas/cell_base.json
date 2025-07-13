@@ -1,0 +1,86 @@
+{
+  "type": "object",
+  "properties": {
+    "tabid": {
+      "type": "string",
+      "maxLength": 10
+    },
+    "otabid": {
+      "type": "string"
+    },
+    "cellid": {
+      "type": "string"
+    },
+    "row": {
+      "type": "integer"
+    },
+    "col": {
+      "type": "integer"
+    },
+    "inner_html": {
+      "type": "string"
+    },
+    "text": {
+      "type": "string"
+    },
+    "colspan": {
+      "type": "integer"
+    },
+    "rowspan": {
+      "type": "integer"
+    },
+    "has_num": {
+      "type": "bool"
+    },
+    "num_str": {
+      "type": "string"
+    },
+    "num": {
+      "type": "number"
+    },
+    "has_deci": {
+      "type": "bool",
+      "description": "Did the original string has a decimal point?"
+    },
+    "num_deci": {
+      "type": "integer",
+      "description": "Number of digits after decimal point in original string"
+    },
+    "bracket": {
+      "type": "string",
+      "enum": ["", "()", "[]", "{}"]
+    },
+    "has_sig_star": {
+      "type": "bool"
+    },
+    "sig_star_str": {
+      "type": "string"
+    },
+    "other_num_str": {
+      "type": "string",
+      "description": "Not empty if we found another number string looking from the right"
+    },
+    "nchar": {
+      "type": "integer"
+    },
+    "nchar_letters": {
+      "type": "integer"
+    },
+    "flag_two_num": {
+      "type": "bool",
+      "description": "Are there two numbers in the cell? Can suggests incorrect cell splits."
+    },
+    "flag_two_deci": {
+      "type": "bool",
+      "description": "Are there two decimal numbers in the cell? More strongly suggests wrong cell split."
+    },
+    "flag_miss_bracket_below": {
+      "type": "bool",
+      "description": "Do we miss a cell like (3.42) below, because such cells are below other numbers in the row?"
+    },
+    "flag_miss_num_above_bracket": {
+      "type": "bool",
+      "description": "Complements flag_miss_bracket_below, do we miss a cell with a normal number like 1.32 above a cell like (3.42)?"
+    }
+  }
+}

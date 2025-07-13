@@ -1,0 +1,33 @@
+{
+  "type": "object",
+  "properties": {
+    "tabid": {
+      "type": "string",
+      "maxLength": 10
+    },
+    "otabid": {
+      "type": "string"
+    },
+    "cellid": {
+      "type": "string"
+    },
+    "row": {
+      "type": "integer"
+    },
+    "col": {
+      "type": "integer"
+    },
+    "inner_html": {
+      "type": "string"
+    },
+    "text": {
+      "type": "string"
+    },
+    "colspan": {
+      "type": "integer"
+    },
+    "rowspan": {
+      "type": "integer"
+    }
+  }
+}

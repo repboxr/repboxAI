@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "properties": {
+    "readme_file": {
+      "type": "string",
+      "description": "The name of the readme file."
+    },
+    "dataset_file": {
+      "type": "string",
+      "description": "Name of the data set."
+    },
+    "dataset_descr": {
+      "type": "string",
+      "description": "Based on the information in the README a short description of the data set in 1 to 4 sentences."
+    },
+    "dataset_source": {
+      "type": "string",
+      "description": "If the README provides any information on the data set source, please state the source here."
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "type": "object",
+  "properties": {
+    "runid": {
+      "type": "integer",
+      "description": "The unique runid of the regression as stated in the table above. It is also shown in title of the corresponding output chunk of the text file containing all Stata scripts with regression outputs."
+    },
+    "script_file": {
+      "type": "string",
+      "description": "The name of the Stata script file that contains the regression."
+    },
+    "script_num": {
+      "type": "integer",
+      "description": "The corresponding number of the script file as shown in the table of all Stata scripts in the prompt."
+    },
+    "code_line": {
+      "type": "integer",
+      "description": "The code line of the regression command in its Stata script. For regression commands spaning more than one line, use the first code line."
+    },
+    "tabid": {
+      "type": ["string", "null"],
+      "description": "If you can map the regression to a particular table shown in the list above, state here the corresponding tabid. Otherwise set null."
+    },
+    "figid": {
+      "type": ["string", "null"],
+      "description": "If the regression is used to generate a particular figure in article or appendix, please note here the figure id. For example, if a figure is called 'Figure 5' the figid would be just '5', if a figure is called 'Fugure A.1' the figid would be 'A.1'."
+    },
+    "cell_ids": {
+      "type": "string",
+      "description": "Relevant if the run regression can be mapped to particular table. A comma separated list of all cell ids of those cells in the HTML version of the table that correspond to the specific run regression. E.g. for a table with tabid='2', this comma separated string of cell ids might look like 'c2_10,c2-12,c2-14'. Each cell id can be found as the 'id' tag of the corresponding <td> or <th> element of the HTML version of the article's tables. Only add cells that show numeric results, e.g. estimated coefficient, or number of observations, but no title cells or cells showing variable labels. Some tables in articles are structured such that some descriptive statistics, like the number of observations are shown on the bottom of a column and apply to multiple regressions shown in that column. Add the corresponding cell id for every regression, that they apply to."
+    },
+    "problem": {
+      "type": ["string", "null"],
+      "description": "Did you encounter a problem related to this mapping? If yes describe it here. Typically this field will be empty. Only write something if there is an important problem that substantially hampers this mapping task."
+    }
+  }
+}

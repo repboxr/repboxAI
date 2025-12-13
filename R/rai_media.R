@@ -102,6 +102,6 @@ rai_save_prompt_media_file = function(txt, project_dir, base, ind=NULL) {
   } else {
     outfile = paste0(dir, "/", tools::file_path_sans_ext(base),"--", ind, tools::file_ext(base))
   }
-  writeUtf8(txt, outfile)
+  writeUtf8(paste0(txt, collapse="\n"), outfile)
   outfile
 }

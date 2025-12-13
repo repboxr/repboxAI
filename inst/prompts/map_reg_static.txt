@@ -18,9 +18,9 @@ Your task is the following:
 
 3. If the table shows regressions, create for every regression shown in the table at least one entry in the JSON array specified below. In particular you shall identify all cells showing numbers related to that regression and the script file and code line containing the regression command used to generate that number. The code line should correspond to the actual regression command in Stata, that generates the shown number, not to a later command that writes the regression output to a file.
 
-4. Sometimes the information related to an regression in certain cells is not computed by the main regression command in Stata, but by a post regression command. This can e.g. be the case for a particular test related to this regression. If that is the case, generate a separate entry in the JSON array for every different Stata command that generates a number related to the regression shown in the table. But make sure that all entries referring to the same regression have the same value for the field "reg_ind" that specifies the regression. 
+4. Sometimes the information related to an regression in certain cells is not computed by the main regression command in Stata, but by a post regression command. This can e.g. be the case for a particular test related to this regression. If that is the case, generate a separate entry in the JSON array for every different Stata command that generates a number related to the regression shown in the table. But make sure that all entries referring to the same regression have the same value for the field "regid" that specifies the regression. 
 
-5. Often multiple table cell correspond to the same regression "reg_ind" and the same Stata "code _line". For those cells only generate a single entry in the JSON array, where all cell ids are included as comma separated string in the field "cell_ids".
+5. Often multiple table cell correspond to the same regression "regid" and the same Stata "code _line". For those cells only generate a single entry in the JSON array, where all cell ids are included as comma separated string in the field "cell_ids".
 
 JSON RESPONSE SCHEMA:
 
@@ -33,9 +33,9 @@ JSON RESPONSE SCHEMA:
         "type": "string",
         "description": "The table ID as stated in the list of tables above."
       },
-      "reg_ind": {
-        "type": "integer",
-        "description": "A counter that provides a uniqe integer number for each regression that you have identified across all tables. Start with 1 and increment for each regression."
+      "regid": {
+        "type": "string",
+        "description": "A unique id you assign to each regression that you have identified. The format shall be `r{tabid}_{counter}`. E.g. the regid of 4th regression identified in Table 2 would be r2_4"
       },
       "script_file": {
         "type": "string",

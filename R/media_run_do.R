@@ -29,14 +29,22 @@ rai_media_run_do = function(project_dir, parcels = list(), output_just_runid = N
   run_df = left_join(run_df, cmd_df %>% select(artid, file_path, line, is_reg), by = c("artid", "file_path", "line"))
   
   if (just_reg_log) {
-    script_nums = unique(cmd_df$script_num[cmd_df$is_reg])
+    library(repboxStata)
+    reg_cmds = unique(c(stata_cmds_reg(), stata_cmds_postreg_comp(), stata_cmds_quasireg()))
+    reg_cmd_df = cmd_df %>% filter(cmd %in% reg_cmds | is_reg) 
+    
+    script_nums = unique(reg_cmd_df$script_num)
     script_df = script_df[script_df$script_num %in% script_nums,]
     cmd_df = cmd_df[cmd_df$script_num %in% script_nums,]
     
+    # add runid to regression commands, postregression commands that compute something and quasi regression commands
+    
+    cmd_runids = run_df$runid[run_df$is_reg | run_df$cmd %in% reg_cmds]
+    
     if (is.null(output_just_runid)) {
-      output_just_runid = run_df$runid[run_df$is_reg]
+      output_just_runid = cmd_runids
     } else {
-      output_just_runid = intersect(output_just_runid, run_df$runid[run_df$is_reg])
+      output_just_runid = intersect(output_just_runid, cmd_runids)
     }
     if (is.null(header)) {
       header="This file contains all Stata do scripts that contain at least one regression command. 

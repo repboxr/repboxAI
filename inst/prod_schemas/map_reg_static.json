@@ -5,9 +5,9 @@
       "type": "string",
       "description": "The table ID as stated in the list of tables above."
     },
-    "reg_ind": {
-      "type": "integer",
-      "description": "A counter that provides a uniqe integer number for each regression that you have identified across all tables. Start with 1 and increment for each regression."
+    "regid": {
+      "type": "string",
+      "description": "A unique id you assign to each regression that you have identified. The format shall be `r{{tabid}}_{{counter}}`. E.g. the regid of 4th regression identified in Table 2 would be r2_4"
     },
     "script_file": {
       "type": "string",

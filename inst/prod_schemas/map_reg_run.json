@@ -5,13 +5,13 @@
       "type": "string",
       "description": "The table ID as stated in the list of tables above."
     },
-    "reg_ind": {
-      "type": "integer",
-      "description": "A counter that provides a uniqe integer number for each regression that you have identified across all tables. Start with 1 and increment for each regression."
+    "regid": {
+      "type": "string",
+      "description": "A unique id you assign to each regression that you have identified. The format shall be `r{{tabid}}_{{counter}}`. E.g. the regid of 4th regression identified in Table 2 would be r2_4"
     },
     "cell_ids": {
       "type": "string",
-      "description": "A comma separated list of all cell ids of those cells in the HTML version of the table that correspond to this specific regression and whose value was computed by the specified code line and correspond to the specified output. E.g. for a table with tabid='2', this comma separated string of cell ids might look like 'c2_10,c2_12,c2_14'. Each cell id can be found as the 'id' tag of the corresponding <td> or <th> element of the HTML version of the article's table. Only add cells that show numeric results, e.g. estimated coefficient, or number of observations, but no title cells or cells showing variable labels. Some tables in articles are structured such that some descriptive statistics, like the number of observations are shown on the bottom of a column and apply to multiple regressions shown in that column. Add the corresponding cell id for every regression, that they apply to."
+      "description": "A comma separated list of all cell ids of those cells in the HTML version of the table that correspond to this specific regression and whose value was computed by the specified code line and correspond to the specified output. E.g. for a table with tabid='2', this comma separated string of cell ids might look like 'c2_10,c2_12,c2_14'. Each cell id can be found as the 'id' tag of the corresponding <td> or <th> element of the HTML version of the article's table. Only add cells that show numeric results, e.g. estimated coefficient, or number of observations, but no title cells or cells showing variable labels. Don't add here cells that belong to the regression but are computed in another (post-)regression command. For those cells a separate entry shall be generated. Some tables in articles are structured such that some descriptive statistics, like the number of observations are shown on the bottom of a column and apply to multiple regressions shown in that column. Add the cell ids of such statistics to every regression, that they apply to."
     },
     "runid": {
       "type": ["integer", "null"],
@@ -28,6 +28,27 @@
     "code_line": {
       "type": ["integer", "null"],
       "description": "The code line of the regression command in the script file."
+    },
+    "wrong_number_cases": {
+      "type": "array",
+      "description": "Sometimes, but quite rarely, there was a transcription error when the article was written such that one or multiple numbers shown in the regression table don't correspond to the actual numbers computed by the Stata command in the replication package. If you find such cases for the current regression, note them in this array. Don't note cases where numbers between the Stata output and table only differ because they are rounded to a different number of digits or formatted differently, which is very common and no problem. Usually all numbers are transcribed correctly and this array will be empty. Also don't note here those cells whose number is computed by another (post-)regression command. As explained in the instructions for numbers belonging to this regression but compted by another post regression command, a complete new main entry shall be generated.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "cell_id": {
+            "type": "string",
+            "description": "The cell_id of the table cell showing the wrong number, e.g. 'c2_10'"
+          },
+          "wrong_number_in_cell": {
+            "type": "number",
+            "description": "The wrong number shown in the cell. Ignore special formating and just write down the numeric value."
+          },
+          "number_in_stata_output": {
+            "type": "number",
+            "description": "The actual number shown in the output of the Stata regression."
+          }
+        }
+      }
     },
     "problem": {
       "type": ["string", "null"],

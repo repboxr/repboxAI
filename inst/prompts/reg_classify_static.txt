@@ -29,9 +29,9 @@ JSON RESPONSE SCHEMA:
         "type": ["string"],
         "description": "The table ID as stated in the list of regressions above."
       },
-      "reg_ind": {
-        "type": ["integer"],
-        "description": "The regression index as stated in the field 'reg_ind' in the list of regressions shown above."
+      "regid": {
+        "type": ["string"],
+        "description": "The regression ID as stated in the field 'regid' in the list of regressions shown above."
       },
       "short_descr": {
         "type": "string",

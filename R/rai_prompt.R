@@ -21,7 +21,7 @@ rai_prompt_value_reg_list_static = function(map_df, values=list()) {
   # Transform map_df to reg_df
   map_df = rename.cols(map_df, "do_file","script_file")
   reg_df = map_df %>%
-    group_by(tabid, reg_ind) %>%
+    group_by(tabid, regid) %>%
     summarize(
       cell_ids = merge_unique_comma_str(cell_ids),
       script_files = merge_unique_comma_str(script_file),

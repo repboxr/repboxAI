@@ -19,7 +19,7 @@ example = function() {
 }  
 
 
-rai_pru_base = function(project_dir, prod_id, doc_type="art", ai_opts = get_ai_opts(), verbose=TRUE, to_v0=TRUE, tpl_id = paste0(prod_id), json_mode=TRUE, use_schema = FALSE, overwrite=FALSE, tpl_dir = rai_tpl_dir(), tpl_file = NULL, proc_prefix = "", proc_postfix="", parcels=list()) {
+rai_pru_base = function(project_dir, prod_id, doc_type="art", ai_opts = get_ai_opts(), verbose=TRUE, to_v0=TRUE, tpl_id = paste0(prod_id), json_mode=TRUE, use_schema = FALSE, overwrite=FALSE, tpl_dir = rai_tpl_dir(), tpl_file = NULL, proc_prefix = "", proc_postfix="", proc_id=NULL, parcels=list()) {
   fp_dir = file.path(project_dir, "fp", paste0("prod_",doc_type))
   prefix = postfix = ""
   pru = copy_into_list()
@@ -69,7 +69,7 @@ rai_pru_add_doc = function(pru, add_all_doc=TRUE, doc_file_form_pref = doc_file_
 #   pru
 # }
 
-rai_pru_add_tab_df = function(pru, tab_prod_id = "tab_main", tab_df_pref = tab_df_default_pref(tab_prod_id), by_tab = FALSE, tab_chunk_size = if (by_tab) 1 else NULL, tab_df_id = tab_prod_id) {
+rai_pru_add_tab_df = function(pru, tab_prod_id = "tab_main", tab_df_pref = tab_df_default_pref(tab_prod_id), by_tab = FALSE, tab_chunk_size = if (by_tab) 1 else NULL, tab_df_id = tab_prod_id, just_tabid = NULL) {
   if (is.null(pru)) return(pru)
   pru = copy_into_list(dest=pru, exclude = "pru")
   restore.point("rai_pru_add_tab_df")
@@ -82,6 +82,10 @@ rai_pru_add_tab_df = function(pru, tab_prod_id = "tab_main", tab_df_pref = tab_d
   
   
   pru$tab_df = fp_load_prod_df(pru$tab_df_info$ver_dir)
+  
+  if (!is.null(just_tabid)) {
+    pru$tab_df = pru$tab_df[pru$tab_df$tabid %in% just_tabid,]
+  }
   
   postfix=paste0("-", pru$tab_df_info$proc_id)
   if (isTRUE(tab_chunk_size < NROW(pru$tab_df)) & !by_tab) {
@@ -229,7 +233,7 @@ proc_rai_pru = function(pru) {
   prefix = paste0(pru$proc_prefix, pru$prefix)
   postfix = paste0(pru$postfix, pru$proc_postfix)
   
-  pru$proc_info = rai_make_proc_info(prod_id=pru$prod_id,ai_opts = pru$ai_opts,tpl_file = pru$tpl_file, json_mode=pru$json_mode, use_schema = pru$use_schema, tpl_id=pru$tpl_id,proc_prefix = prefix, proc_postfix = postfix)
+  pru$proc_info = rai_make_proc_info(prod_id=pru$prod_id,ai_opts = pru$ai_opts,tpl_file = pru$tpl_file, json_mode=pru$json_mode, use_schema = pru$use_schema, tpl_id=pru$tpl_id,proc_prefix = prefix, proc_postfix = postfix, proc_id = pru[["proc_id"]])
   
   pru$proc_id  = pru$proc_info$proc_id
   pru = pru_init_dirs(pru=pru)
@@ -264,6 +268,10 @@ proc_rai_pru = function(pru) {
   if ("script_list" %in% pru$tpl_var) {
     values = rai_prompt_value_script_list(pru$do_df, values)
   }
+  if (!is.null(pru[["values"]])) {
+    values[[names(pru$values)]] = pru$values
+  }
+  
   pru$values = values
   
   pru_next_stage(pru, "proc_rai_pru_run")
@@ -344,7 +352,9 @@ proc_rai_pru_run = function(pru) {
   temp_pru_save(pru); #pru = temp_pru
   if (!pru_is_ok(pru)) return(invisible(pru))
   prod = repbox_prod(pru$prod_id)
+  # Check: obj or arr? -> Need obj
   schema = prod_to_schema(prod, "obj")
+  
   res_df = ai_combine_content_df(pru$items,schema=schema)
   prod_df = df_to_prod_df(res_df, repbox_prod(pru$prod_id))
   pru_save(pru, prod_df)

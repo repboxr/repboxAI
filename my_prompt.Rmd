@@ -1,0 +1,4078 @@
+Below are relevant files from my R project.
+
+################################################
+# R project DESCRIPTION file:
+################################################
+
+```
+Package: repboxAI
+Type: Package
+Title: AI production chain for repbox
+Version: 0.1.0
+Author: Sebastian Kranz
+Maintainer: Sebastian Kranz <sebastian.kranz@uni-ulm.de>
+Description: AI production chain for repbox
+License: GPL>= 20.
+Encoding: UTF-8
+Depends: repboxUtils, repboxDB, DataSchema, rgemini, digest, xml2, 
+         repboxDoc, repboxTableTools, aikit, FuzzyProduction
+LazyData: true
+```
+
+
+################################################
+# R code files:
+################################################
+
+
+# FILE: data_to_prompt.R
+```
+example = function() {
+  # dummy data
+  set.seed(42)
+  df = data.frame(
+    respondent_id = sprintf("ID%03d", 1:100),
+    name          = sample(c("Alice", "Bob", NA, "Diane"), 100, TRUE),
+    income        = rnorm(100, 50000, 12000),
+    birth_date    = as.Date("1980-01-01") + sample(0:15000, 100, TRUE),
+    stringsAsFactors = FALSE
+  )
+  attr(df$income, "label") = "Annual income in USD"
+  
+  cat(data_set_to_prompt(df, "demo_data"))
+  data_set_quick_overview(df, "mydata")
+}
+
+
+#' Compact, prompt‑ready data‑set overview (no parentheses)
+#'
+#' @param dat         data.frame / tibble
+#' @param data_name   Header label
+#' @param top_n       How many examples or levels to show (default 3)
+#' @param trunc_chars Truncate long strings / levels to this many chars (default 10)
+#' @return            Single character string
+#'
+data_set_to_prompt = function(dat, data_name,
+                                top_n = 3, trunc_chars = 10) {
+
+  if (!requireNamespace("stringi", quietly = TRUE))
+    stop("Install the 'stringi' package.")
+  if (!requireNamespace("dplyr", quietly = TRUE))
+    stop("Install the 'dplyr' package.")
+
+  library(stringi)
+  library(dplyr)
+  library(purrr)
+
+  # ------------------------------------------------------------------
+  # helpers
+  # ------------------------------------------------------------------
+  get_type = function(x) {
+    cls <- class(x)[1]
+    if (cls %in% c("numeric", "double"))  "num"
+    else if (cls == "integer")            "int"
+    else if (inherits(x, "Date"))         "date"
+    else if (inherits(x, "POSIXt"))       "datetime"
+    else if (is.factor(x))                "factor"
+    else                                  "chr"
+  }
+
+  trunc_str = function(s, k = trunc_chars) {
+    s <- as.character(s)
+    too_long <- nchar(s, type = "chars") > k
+    s[too_long] <- paste0(substr(s[too_long], 1, k), "...")
+    s
+  }
+
+  summarise_var = function(x, v_type) {
+    if (v_type %in% c("num", "int")) {
+      s <- summary(x)
+      sprintf("stats=min=%s med=%s max=%s",
+              format(s["Min."], trim = TRUE),
+              format(s["Median"], trim = TRUE),
+              format(s["Max."], trim = TRUE))
+    } else if (v_type == "chr") {
+      uvals <- unique(x[!is.na(x)])
+      if (length(uvals) == 0) return("")
+      samp  <- trunc_str(sample(uvals, min(top_n, length(uvals))))
+      paste0("sample=", stri_join(samp, collapse = ", "))
+    } else if (v_type == "factor") {
+      tbl <- sort(table(x, useNA = "no"), decreasing = TRUE)
+      if (length(tbl) == 0) return("")
+      top <- head(tbl, top_n)
+      names(top) <- trunc_str(names(top))
+      paste0("main_levels=", stri_join(names(top), "(", as.integer(top), ")",
+                                       collapse = ", "))
+    } else if (v_type %in% c("date", "datetime")) {
+      if (all(is.na(x))) return("")
+      rng <- range(x, na.rm = TRUE)
+      paste0("range=", format(rng[1]), " ... ", format(rng[2]))
+    } else ""
+  }
+
+  # ------------------------------------------------------------------
+  # pre‑compute column widths for tidy alignment
+  # ------------------------------------------------------------------
+  var_names_trunc <- trunc_str(names(dat), 30)            # never wider than 30
+  var_width  <- max(nchar(var_names_trunc))               # pad to longest
+  type_width <- 8                                         # "datetime" fits
+  int_width  <- nchar(as.character(nrow(dat)))            # for non‑NA/unique
+
+  # ------------------------------------------------------------------
+  # build variable lines
+  # ------------------------------------------------------------------
+  lines <- map_chr(
+    seq_along(dat),
+    function(i) {
+      var      <- var_names_trunc[i]
+      x        <- dat[[i]]
+      v_type   <- get_type(x)
+      n_non_na <- sum(!is.na(x))
+      n_unique <- length(unique(x[!is.na(x)]))
+      miss_pct <- round(mean(is.na(x)) * 100, 1)
+      summary  <- summarise_var(x, v_type)
+
+      sprintf(
+        "%-*s  type=%-*s  non-NA=%*d  unique=%*d  miss%%=%5.1f  %s",
+        var_width,  var,
+        type_width, v_type,
+        int_width,  n_non_na,
+        int_width,  n_unique,
+        miss_pct,
+        summary
+      )
+    }
+  )
+
+  # ------------------------------------------------------------------
+  # variable labels
+  # ------------------------------------------------------------------
+  label_lines <- map_chr(
+    names(dat),
+    function(v) {
+      lbl <- attr(dat[[v]], "label", exact = TRUE)
+      if (is.null(lbl) || lbl == "") "" else sprintf("%s: %s", v, lbl)
+    }
+  )
+  label_lines <- label_lines[label_lines != ""]
+
+  # ------------------------------------------------------------------
+  # header + assembly
+  # ------------------------------------------------------------------
+  header <- sprintf(
+    "%s  |  n=%d  vars=%d  size=%.2f MB",
+    data_name, nrow(dat), ncol(dat),
+    round(as.numeric(object.size(dat)) / 1024^2, 2)
+  )
+  out <- c(header, strrep("-", nchar(header)), lines)
+  if (length(label_lines) > 0)
+    out <- c(out, "", "Variable labels:", label_lines)
+
+  stringi::stri_join(out, collapse = "\n")
+}
+
+
+#' Build a privacy‑aware description of a data frame for LLM prompts
+#'
+#' The output is ready to paste under “Materials supplied to you” in your
+#' privacy‑audit prompt.  It now *starts* with a one‑sentence disclaimer:
+#'     “Sample values below are masked or truncated …”
+#'
+#' @param dat        A data.frame or tibble
+#' @param data_name  Character; human‑readable name of the data set
+#' @param max_sample Max number of example values per variable (default 3)
+#' @return           A single character string
+#'
+#' Dependencies: stringi  (install.packages("stringi"))
+#'
+#' Build a privacy‑aware description of a data frame for LLM prompts
+#'
+#' *No global date range is reported.*  
+#' Sample values are masked or truncated **only in this summary**
+#' to avoid leaking PII; the underlying data remain unchanged.
+#'
+#' Masking rule  : show first 2 and last 1 characters → "Al***r"  
+#' Truncation    : show first 3 characters, then "..." → "Ale..."  
+#'
+#' @param dat        data.frame or tibble to summarise
+#' @param data_name  Character; human‑readable dataset name
+#' @param max_sample Integer; examples per variable (default 3)
+#' @param max_total  Integer; string length at which to truncate (default 12)
+#' @return           Single character string, ready for LLM prompts
+#'
+#' Requires package stringi
+#'
+data_set_to_prompt_privacy = function(dat, data_name,
+                                    max_sample = 3, max_total = 12) {
+
+  if (!requireNamespace("stringi", quietly = TRUE))
+    stop("Please install the 'stringi' package.")
+  library(stringi)
+
+  ## ------------------------------------------------------------------------
+  ## Helper functions
+  ## ------------------------------------------------------------------------
+
+  get_type = function(x) {
+    cls = class(x)[1]
+    if (cls %in% c("numeric", "integer")) "num"
+    else if (inherits(x, "Date"))         "date"
+    else if (inherits(x, "POSIXt"))       "datetime"
+    else if (is.factor(x))                "factor"
+    else                                  "chr"
+  }
+
+  # Mask (*** between first 2 & last 1) or truncate (first 3 + ...)
+  mask_string = function(s, max_total = 12) {
+    s = as.character(s)
+    if (is.na(s)) return("NA")
+    n = nchar(s, type = "chars")
+
+    if (n <= 3) {
+      s  # keep as is (very short)
+    } else if (n <= max_total) {
+      paste0(substr(s, 1, 2), "***", substr(s, n, n))
+    } else {
+      paste0(substr(s, 1, 3), "...")
+    }
+  }
+
+  # Build a single variable line
+  build_var_line = function(var_name) {
+    x            = dat[[var_name]]
+    n_non_na     = sum(!is.na(x))
+    n_unique     = length(unique(x[!is.na(x)]))
+    na_pct       = if (nrow(dat) == 0) 0 else (1 - n_non_na / nrow(dat)) * 100
+    var_type     = get_type(x)
+
+    # Random sample of distinct non‑NA values
+    if (n_non_na == 0) {
+      sample_vals = "NA"
+    } else {
+      samp = sample(unique(x[!is.na(x)]), min(max_sample, n_unique))
+      samp = switch(
+        var_type,
+        chr      = vapply(samp, mask_string, character(1), max_total = max_total),
+        factor   = vapply(as.character(samp), mask_string, character(1),
+                          max_total = max_total),
+        num      = format(round(as.numeric(samp), 3), trim = TRUE),
+        date     = format(as.Date(samp)),
+        datetime = format(as.POSIXct(samp, tz = "UTC")),
+        samp
+      )
+      sample_vals = stri_join(samp, collapse = ", ")
+    }
+
+    # Date range inside variable description (if applicable)
+    range_str = ""
+    if (var_type %in% c("date", "datetime") && n_non_na > 0) {
+      rng = range(x, na.rm = TRUE)
+      range_str = stri_paste("; range: ",
+                             format(rng[1], "%Y-%m-%d"), " ... ",
+                             format(rng[2], "%Y-%m-%d"))
+    }
+
+    stri_paste(
+      var_name, " (", n_unique, "/", n_non_na,
+      " unique, ", var_type, ", NA%=", sprintf("%.1f", na_pct), "): ",
+      sample_vals, range_str
+    )
+  }
+
+  ## ------------------------------------------------------------------------
+  ## Header
+  ## ------------------------------------------------------------------------
+  n_obs   = nrow(dat)
+  n_vars  = ncol(dat)
+  size_mb = round(as.numeric(object.size(dat)) / 1024^2, 2)
+
+  header = stri_paste(
+    data_name, " (", n_obs, " obs, ", n_vars,
+    " vars, ", size_mb, " MB)"
+  )
+
+  disclaimer = paste(
+    "NOTE: Sample values below are randomly chosen and may be",
+    "masked (*** pattern) or truncated (...) solely for this",
+    "summary; the original dataset is unchanged."
+  )
+
+  ## ------------------------------------------------------------------------
+  ## Variable lines and variable‑label appendix
+  ## ------------------------------------------------------------------------
+  var_lines = vapply(names(dat), build_var_line, character(1), USE.NAMES = FALSE)
+
+  label_lines = vapply(
+    names(dat),
+    function(v) {
+      lbl = attr(dat[[v]], "label", exact = TRUE)
+      if (is.null(lbl) || lbl == "") "" else stri_paste(v, ": ", lbl)
+    },
+    character(1),
+    USE.NAMES = FALSE
+  )
+  label_lines = label_lines[label_lines != ""]
+
+  ## ------------------------------------------------------------------------
+  ## Combine and return
+  ## ------------------------------------------------------------------------
+  descr_parts = c(header, disclaimer, var_lines)
+  if (length(label_lines) > 0)
+    descr_parts = c(descr_parts, "", "Variable labels:", label_lines)
+
+  stringi::stri_join(descr_parts, collapse = "\n")
+}
+```
+# END OF FILE: data_to_prompt.R
+
+-----------------------------------------------------------
+
+
+# FILE: dirs.R
+```
+rai_fp_dir = function(project_dir, doc_type) {
+  paste0(project_dir, "/fp/prod_", doc_type)
+}
+
+
+rai_fp_dirs = function(project_dir) {
+  dir(file.path(project_dir, "fp"), pattern=glob2rx("prod_*"), recursive = FALSE, full.names=TRUE)
+}
+
+rai_ver_dir_to_project_dir = function(ver_dir) {
+  dirname(dirname(dirname(dirname(ver_dir))))
+}
+
+rai_ver_dir_to_doc_type = function(ver_dir) {
+  fp_dir = basename(fp_ver_dir_to_fp_dir(ver_dir))
+  stri_sub(fp_dir, 6)
+}
+
+
+project_dir_to_fp_dir = function(project_dir, doc_type = "art") {
+  fp_dir = file.path(project_dir, "fp", paste0("prod_", doc_type))
+  fp_dir
+}
+
+doc_dir_to_fp_dir = function(doc_dir) {
+  if (!basename(dirname(doc_dir))=="doc") stop(paste0("Not a proper doc_dir: ", doc_dir))
+  project_dir = dirname(dirname(doc_dir))
+  doc_type = repboxDoc::rdoc_type(doc_dir)
+  project_dir_to_fp_dir(project_dir, doc_type)
+}
+
+```
+# END OF FILE: dirs.R
+
+-----------------------------------------------------------
+
+
+# FILE: ev_map.R
+```
+# Functions that evaluate mappings between regressions in tables and 
+# regression outputs in Stata code.
+
+# relevant products tab_main (table structure)
+# map_reg_run, map_reg_inv_run, map_reg_static
+```
+# END OF FILE: ev_map.R
+
+-----------------------------------------------------------
+
+
+# FILE: ev_tab.R
+```
+# Rank tab versions and pick a standard
+
+example = function() {
+  project_dir = "~/repbox/projects_share/aejapp_1_2_4"
+  project_dir = "~/repbox/projects_share/aeri_1_2_6"
+  doc_type = "art"
+  doc_type = "app1"
+  
+  rstudioapi::filesPaneNavigate(project_dir)
+}
+
+repbox_ev_tab = function(project_dir, doc_type="art") {
+  fp_dir = project_dir_to_fp_dir(project_dir, doc_type)
+  ev_dir = file.path(project_dir, "fp", paste0("eval_", doc_type))
+  if (!dir.exists(ev_dir)) dir.create(ev_dir)
+  
+  fp_all_ver_dirs(fp_dir, "cell_base")
+  cell_base = fp_load_all_prod_df(fp_dir, "cell_base")
+  cell_base = cell_base %>% group_by(ver_id, tabid) %>%
+    filter(endsWith(ver_id, "v0"))
+  
+  deci_df = cell_base %>% filter(has_num & is.true(has_deci))
+  id_li = list(
+    deci_df %>%
+      arrange(row, col) %>%
+      summarize(ind = "by_row_deci", value = paste0(bracket,num_str, collapse="|")),
+    deci_df %>%
+      arrange(col,row) %>%
+      summarize(ind = "by_col_deci", value = paste0(bracket,num_str, collapse="|")),
+    deci_df %>%
+      arrange(num_str, bracket) %>%
+      summarize(ind = "set_deci", value =  paste0(bracket,num_str, collapse="|"))
+  )
+  id_df = bind_rows(id_li)    
+
+  group_df = id_df %>%
+    group_by(tabid, ind, value) %>%
+    summarize(
+      group = list(ver_id),
+      group_size = n()
+    )
+  
+  ev_df = id_df %>%
+    group_by(tabid, ind) %>%
+    summarize(
+      num_ver = n(),
+      num_group = n_distinct(value)
+    )
+  
+} 
+
+left_join_all = function(li, by=NULL) {
+  df = li[[1]]
+  for (i in setdiff(seq_along(li),1)) {
+    df = left_join(df, li[[i]]) 
+  }
+  df
+}
+```
+# END OF FILE: ev_tab.R
+
+-----------------------------------------------------------
+
+
+# FILE: load.R
+```
+rai_agg_all_prod_df = function(projects_dir, prod_id) {
+  restore.point("rai_agg_all_prod_df")
+  df = FuzzyProduction::fp_load_all_prod_df(projects_dir,prod_id, add_ver_dir=TRUE)
+  df$project_dir = str.left.of(df$ver_dir,"/fp/")
+  df$artid = basename(df$project_dir)
+  df = df[, union("artid", names(df))]
+  df
+}
+
+
+rai_file_cache = function(...) {
+  new.env(parent=emptyenv())
+}
+
+
+rai_pick_tab_ver = function(fp_dir, prod_id = "tab_html", pref=NULL, proc_id=NULL) {
+  restore.point("rai_pick_tab_ver")
+  if (is.null(pref)) {
+    if (prod_id == "tab_notes") {
+      pref = fp_pref(proc_regex = c("html","^pdf-g2f.*"))
+    } else {
+      pref = fp_pref(proc_regex = c("html", "mocr","pdf-.*","pdf_txt"))
+      
+    }
+  }
+  fp_pick_prod_ver(fp_dir, prod_id=prod_id,proc_id=proc_id, pref=pref)
+}
+
+# Shorten file paths if files are unique
+# to reduce length of output tokens
+script_df_shorten_file = function(script_df) {
+  if (!anyDuplicated(script_df$file_path)) {
+    script_df$script_file = basename(script_df$file_path)
+  } else {
+    script_df$script_file = script_df$file_path
+  }
+  script_df
+}
+
+rai_load_do_source = function(project_dir, parcels=list()) {
+  parcels = repdb_load_parcels(project_dir, "stata_source",parcels)
+  script_df = parcels$stata_source$script_source
+  script_df = script_df_shorten_file((script_df))
+  script_df
+}
+
+rai_load_tab_prod_df = function(fp_dir, prod_id = "tab_html", pref=NULL, proc_id=NULL, cache=NULL) {
+  restore.point("rai_load_tab_prod_df")
+  ver_dir = rai_pick_tab_ver(fp_dir, prod_id, pref, proc_id)$ver_dir
+  file = file.path(ver_dir, "prod_df.Rds")
+  if (!is.null(cache)) {
+    prod_df = cache[[file]]
+    if (!is.null(prod_df)) return(prod_df)
+  }
+  prod_df = fp_load_prod_df(ver_dir)
+  if (!is.null(cache)) {
+    cache[[file]] = prod_df
+  }
+  prod_df
+}
+
+rai_pick_ref_li_doc_dir = function(project_dir, doc_type="art", tab_ref_pref = tab_ref_default_pref()) {
+  restore.point("rai_load_ref_li")
+  files = paste0(project_dir, "/doc/", doc_type, "_", tab_ref_pref, "/ref_li.Rds")
+  files = files[file.exists(files)]
+  if (length(files)==0) return(NULL)
+  file = files[[1]]
+  dirname(file)
+}
+
+
+rai_doc_file = function(project_dir, doc_type, pref = doc_file_form_default_pref(), doc_form=NULL) {
+  repbox_doc_file_select(project_dir, doc_type = doc_type, doc_file_form_pref = pref, doc_form=doc_form)$doc_file
+}
+```
+# END OF FILE: load.R
+
+-----------------------------------------------------------
+
+
+# FILE: media_run_do.R
+```
+# Create Stata log files for AI
+
+example = function() {
+  #chooseCRANmirror()
+  #install.packages("dplyr")
+  library(repboxDB)
+  library(repboxTableTools)
+  library(repboxAI)
+  project_dir = "/home/rstudio/repbox/projects_gha_new/aejapp_1_2_4"
+  outfile = rai_media_run_do(project_dir)
+  rstudioapi::filesPaneNavigate(dirname(outfile))
+}
+
+
+opts_media_run_do = function(do_max_runs=100000,line_max_runs=100,log_max_char=100000,...) {
+  opts = copy_into_list()
+  opts
+}
+
+
+rai_media_run_do = function(project_dir, parcels = list(), output_just_runid = NULL, opts=opts_media_run_do(), just_reg_log=TRUE, header=NULL) {
+  restore.point("rai_media_run_do")
+  parcels = repdb_load_parcels(project_dir, c("stata_source", "stata_run_cmd", "stata_run_log","stata_cmd"), parcels=parcels)
+  script_df = parcels$stata_source$script_source
+  
+  cmd_df = parcels$stata_cmd$stata_cmd %>% left_join(script_df %>% select(file_path, script_num), by="file_path")
+  log_df = parcels$stata_run_log$stata_run_log
+  run_df = parcels$stata_run_cmd$stata_run_cmd
+  run_df = left_join(run_df, cmd_df %>% select(artid, file_path, line, is_reg), by = c("artid", "file_path", "line"))
+  
+  if (just_reg_log) {
+    script_nums = unique(cmd_df$script_num[cmd_df$is_reg])
+    script_df = script_df[script_df$script_num %in% script_nums,]
+    cmd_df = cmd_df[cmd_df$script_num %in% script_nums,]
+    
+    if (is.null(output_just_runid)) {
+      output_just_runid = run_df$runid[run_df$is_reg]
+    } else {
+      output_just_runid = intersect(output_just_runid, run_df$runid[run_df$is_reg])
+    }
+    if (is.null(header)) {
+      header="This file contains all Stata do scripts that contain at least one regression command. 
+
+Line numbers for each script are shown.      
+      
+For regression commands the logged output is shown below the code line in a block like this example:
+      
+```output runid=25
+. reg y x1 x2, robust
+Linear regression                               Number of obs     =        749
+                                                F(37, 711)        =       4.94
+
+[Further output ommited in example]
+
+```end_ouput runid=25
+
+If the regression command was called multiple times inside a loop, multiple output blocks are shown for that code line.
+            "
+
+    }
+    
+  }
+  
+  if (!is.null(output_just_runid)) {
+    log_df = log_df %>% filter(runid %in% output_just_runid)
+    run_df = run_df %>% filter(runid %in% output_just_runid)
+  }
+  run_df = run_df  %>%
+    left_join(log_df %>% select(runid, logtxt), by="runid") %>%
+    left_join(script_df %>% select(file_path, script_num), by="file_path")
+  
+  run_df = run_df %>%
+    adapt_too_big_run_df(opts=opts)
+  
+  ldf = script_df %>%
+    mutate(
+      txt = stri_split_fixed(script_df$text,"\n")
+    ) %>%
+    select(script_num, txt) %>%
+    tidyr::unnest(txt) %>%
+    group_by(script_num) %>%
+    mutate(
+      orgline = seq_along(txt),
+      #txt = htmltools::htmlEscape(txt)
+    )
+  
+  ldf = left_join(ldf,
+    select(cmd_df, orgline_start, orgline_end, line, is_reg, cmd, script_num),
+    join_by(script_num, between(orgline,orgline_start,orgline_end))
+  )
+  
+  ldf = ldf %>%
+    mutate(
+      line_changes = !is.true(lag(line)==line | is.na(lag(line) & is.na(line))),
+      line_group = cumsum(line_changes)
+    ) %>%
+    group_by(line_group) %>%
+    mutate(
+      orgline_start = min(orgline),
+      orgline_end = max(orgline)
+    )
+  
+  #pad_len = max(2, ceiling(log(max(ldf$orgline+1),10)))
+  #stri_pad_left(ldf$orgline, pad_len)
+  block_df = ldf %>%
+    group_by(script_num, orgline_start, orgline_end, line) %>%
+    summarize(
+      code_txt =  paste0(orgline,": ",txt, collapse="\n")
+    ) %>%
+    ungroup()
+      
+  # Now we aggregate log on a line level
+  loli_df = run_df %>%
+    #left_join(run_df %>% select(runid, line, cmdline), by=c("runid")) %>%
+    mutate(
+      # correct weird log output
+      logtxt = ifelse(endsWith(trimws(cmdline),"{"), "", logtxt),
+      logtxt = paste0(". ", cmdline, "\n", logtxt),
+      # reduce logtext that is too long
+      len_logtxt = nchar(logtxt),
+      logtxt = ifelse(is.true(len_logtxt > opts$log_max_char), paste0(substring(logtxt,1, opts$log_max_char), "\n... further output omitted ..."), logtxt)
+    ) %>%
+    left_join(block_df %>% select(line, script_num, orgline_start), by = c("line", "script_num")) %>%
+    mutate(
+      log_md = paste0('\n```output runid=', runid,'\n',logtxt,'\n```end_output runid=', runid,"\n")
+    ) %>%
+    group_by(script_num, line) %>%
+    summarize(
+      log_md = paste0(log_md, collapse="\n")
+    )
+  
+  code_df = block_df %>%
+    left_join(loli_df, by = c("script_num","line")) %>%
+    mutate(
+      log_md = na_val(log_md, ""),
+      txt = paste0(code_txt, log_md)
+    )
+  
+  
+  all_df = code_df %>%
+    left_join(script_df %>% select(file_path, script_num), by="script_num") %>%
+    group_by(script_num) %>%
+    summarize(
+      script_html = paste0('\n\n#########################\nScript: ',  first(file_path), '\n#########################\n\n', paste0(txt, collapse="\n"))
+    )
+
+  text = paste0(header,paste0(all_df$script_html, collapse="\n"))
+  outdir = paste0(project_dir, "/fp/prompt_files")
+  if (!dir.exists(outdir)) dir.create(outdir, recursive = TRUE)
+  outfile = file.path(outdir, "do_run.txt")
+  writeUtf8(text, outfile)
+  return(outfile)
+}
+
+
+
+
+adapt_too_big_run_df = function(run_df, opts) {
+  restore.point("adapt_too_big_run_df")
+  run_df = run_df %>%
+    group_by(script_num, line) %>%
+    mutate(line.run.count = 1:n()) %>%
+    ungroup() %>%
+    filter(line.run.count <= opts$line_max_runs) %>%
+    group_by(script_num) %>%
+    mutate(do.run.count = 1:n()) %>%
+    ungroup() %>%
+    filter(do.run.count <= opts$do_max_runs)
+  
+  run_df
+}
+
+
+
+# rai_media_run_do_old = function(project_dir, parcels = list(), output_just_runid = NULL, opts=opts_do_run_html()) {
+#   restore.point("rai_media_run_do")
+#   parcels = repdb_load_parcels(project_dir, c("stata_source", "stata_run_cmd", "stata_run_log","stata_cmd"), parcels=parcels)
+#   script_df = parcels$stata_source$script_source
+#   
+#   cmd_df = parcels$stata_cmd$stata_cmd %>% left_join(script_df %>% select(file_path, script_num), by="file_path")
+#   log_df = parcels$stata_run_log$stata_run_log
+#   run_df = parcels$stata_run_cmd$stata_run_cmd
+#   
+#   if (!is.null(output_just_runid)) {
+#     log_df = log_df %>% filter(runid %in% output_just_runid)
+#     run_df = run_df %>% filter(runid %in% output_just_runid)
+#   }
+#   run_df = run_df  %>%
+#     left_join(log_df %>% select(runid, logtxt), by="runid") %>%
+#     left_join(script_df %>% select(file_path, script_num), by="file_path") %>%
+#     adapt_too_big_run_df(opts=opts)
+#   
+#   ldf = script_df %>%
+#     mutate(
+#       txt = stri_split_fixed(script_df$text,"\n")
+#     ) %>%
+#     select(script_num, txt) %>%
+#     tidyr::unnest(txt) %>%
+#     group_by(script_num) %>%
+#     mutate(
+#       orgline = seq_along(txt),
+#       #txt = htmltools::htmlEscape(txt)
+#     )
+#   
+#   ldf = left_join(ldf,
+#     select(cmd_df, orgline_start, orgline_end, line, is_reg, cmd, script_num),
+#     join_by(script_num, between(orgline,orgline_start,orgline_end))
+#   )
+#   
+#   ldf = ldf %>%
+#     mutate(
+#       line_changes = !is.true(lag(line)==line | is.na(lag(line) & is.na(line))),
+#       line_group = cumsum(line_changes)
+#     ) %>%
+#     group_by(line_group) %>%
+#     mutate(
+#       orgline_start = min(orgline),
+#       orgline_end = max(orgline)
+#     )
+#   
+#   block_df = ldf %>%
+#     group_by(script_num, orgline_start, orgline_end, line) %>%
+#     summarize(
+#       code_html = paste0('<pre class="do_code" script_num=', first(script_num),' line=',first(orgline_start),' line_end = ', first(orgline_end),'>\n',htmltools::htmlEscape(paste0(txt, collapse="\n")),'\n</pre>')
+#     ) %>%
+#     ungroup()
+#       
+#   # Now we aggregate log on a line level
+#   loli_df = run_df %>%
+#     #left_join(run_df %>% select(runid, line, cmdline), by=c("runid")) %>%
+#     mutate(
+#       # correct weird log output
+#       logtxt = ifelse(endsWith(trimws(cmdline),"{"), "", logtxt),
+#       # reduce logtext that is too long
+#       len_logtxt = nchar(logtxt),
+#       logtxt = ifelse(is.true(len_logtxt > opts$log_max_char), paste0(substring(logtxt,1, opts$log_max_char), "\n... further output omitted ..."), logtxt)
+#     ) %>%
+#     #left_join(cmd_df %>% select(line, script_num), by = c("line", "script_num") ) %>%
+#     left_join(block_df %>% select(line, script_num, orgline_start), by = c("line", "script_num")) %>%
+#     mutate(
+#       log_html = paste0('\n<pre class="do_output" runid=', runid,' line="', orgline_start,'">\n',htmltools::htmlEscape(logtxt),'\n</pre>')
+#     ) %>%
+#     group_by(script_num, line) %>%
+#     summarize(
+#       log_html = paste0(log_html, collapse="\n")
+#     )
+#   
+#   code_df = block_df %>%
+#     left_join(loli_df, by = c("script_num","line")) %>%
+#     mutate(
+#       log_html = na_val(log_html, ""),
+#       html = paste0(code_html, log_html)
+#     )
+#   
+#   
+#   all_df = code_df %>%
+#     left_join(script_df %>% select(file_path, script_num), by="script_num") %>%
+#     group_by(script_num) %>%
+#     summarize(
+#       script_html = paste0('<h2>Script <span class="script_num">', first(script_num), '</span>: <span class="script_file">', first(file_path),'</span></h2><br><div class="code_and_output">', paste0(html, collapse="\n"),"</div>")
+#     )
+#   
+#   head_html = paste0(
+# '<!DOCTYPE html>
+# <html lang="en">
+# <head>
+#   <meta charset="UTF-8">
+#   <title>Stata do files including output of successfully run code lines</title>
+# <style>
+# /* Base styling for all pre blocks */
+# pre {
+#   margin: 0px;
+#   padding: 1px;
+#   /*border-radius: 8px;*/
+#   font-family: Consolas, Monaco, monospace;
+#   /*line-height: 1.5;*/
+#   overflow-x: auto;
+# }
+# 
+# /* Stata code blocks */
+# .do_code {
+#   margin: 1px;
+#   background-color: #f0f8ff; /* soft blue */
+#   position: relative;
+# }
+# 
+# /* Stata log output blocks */
+# .do_output {
+#   margin-left: 3em;
+#   background-color: #f9f9f9; /* light gray */
+#   position: relative;
+#   color: #444;
+# }
+# </style>
+# ')
+#   html = paste0(head_html, paste0(all_df$script_html, collapse="\n"), '</body></html>')
+#   outdir = paste0(project_dir, "/fp/prompt_files")
+#   if (!dir.exists(outdir)) dir.create(outdir, recursive = TRUE)
+#   outfile = file.path(outdir, "do_run.html")
+#   writeUtf8(html, outfile)
+#   return(outfile)
+# }
+
+
+
+```
+# END OF FILE: media_run_do.R
+
+-----------------------------------------------------------
+
+
+# FILE: proc_all.R
+```
+
+
+repbox_default_fp_analysis = function(project_dir) {
+  library(repboxAI)
+  library(aikit)
+  project_dir = "/home/rstudio/repbox/projects_gha_new/aejapp_1_2_4"
+  
+  if (FALSE)
+    rstudioapi::filesPaneNavigate(project_dir)
+  
+  rgemini::set_gemini_api_key(file = "~/repbox/gemini/gemini_api_key.txt")
+  
+  steps_all = repbox_fp_steps_from(tab_given=TRUE)
+  steps_hx = repbox_fp_steps(tab_given=TRUE)
+  steps2.0 = repbox_fp_steps_from(tab_notes_pdf = TRUE, ev_tab=FALSE)
+  steps2.5 = repbox_fp_steps_from(ev_tab=TRUE)
+  
+  repbox_run_fp(project_dir,steps_hx, overwrite = FALSE)
+
+  set_ai_opts(model = "gemini-2.5-flash-lite-preview-06-17")
+  repbox_run_fp(project_dir,steps2.0, overwrite = FALSE)
+
+  
+  set_ai_opts(model = "gemini-2.0-flash")
+  repbox_run_fp(project_dir,steps2.0, overwrite = FALSE)
+  
+  
+  
+  set_ai_opts(model = "gemini-2.5-flash")
+  repbox_run_fp(project_dir,steps2.5, overwrite = FALSE)
+  
+  set_ai_opts(model = "gemini-2.5-flash-lite-preview-06-17")
+  repbox_run_fp(project_dir,steps2.5, overwrite = FALSE)
+    
+  repbox_rerun_outages(project_dir,steps = steps_all,max_repeat = 5, sleep_sec = 30)
+}
+
+
+example = function() {
+  #ai_clear_cache()
+  library(repboxAI)
+  library(aikit)
+  rgemini::set_gemini_api_key(file = "~/repbox/gemini/gemini_api_key.txt")
+  set_ai_opts(model = "gemini-2.0-flash")
+  project_dir = "~/repbox/projects_share/aejapp_1_2_4"
+  project_dir = "~/repbox/projects_share/qje_3036349" 
+  project_dir = "~/repbox/projects_share/aeri_1_2_6"
+  steps = repbox_fp_steps(map_inv_reg_run = TRUE)
+  #steps = repbox_fp_steps_base()
+  #set_ai_opts(model = "gemini-2.5-pro-exp-03-25")
+  repbox_run_fp(project_dir, steps,overwrite = TRUE,doc_type = "art")
+
+  rstudioapi::filesPaneNavigate(project_dir)
+
+    
+  set_ai_opts(model = "gemini-2.5-pro-exp-03-25")
+  set_ai_opts(model = "gemini-2.0-flash")
+  steps = repbox_fp_steps_advanced()
+  repbox_run_fp(project_dir, steps,overwrite = FALSE)
+  
+  
+  rstudioapi::filesPaneNavigate(project_dir)
+  
+  
+  repbox_rerun_outages(project_dir, steps)
+  
+  library(repboxAI)
+  library(aikit)
+  rgemini::set_gemini_api_key(file = "~/repbox/gemini/gemini_api_key.txt")
+  set_ai_opts(model = "gemini-2.0-flash-thinking-exp")
+  set_ai_opts(model = "gemini-2.0-flash")
+  set_ai_opts(model = "gemini-2.5-pro-exp-03-25")
+  
+  parent_dir = "~/repbox/projects_share"
+  steps2.0 = repbox_fp_steps_from(tab_given=TRUE, ev_tab=FALSE)
+  steps2.5 = repbox_fp_steps_from(ev_tab=TRUE)
+  
+  
+  steps = repbox_fp_steps(map_reg_static = TRUE)
+  steps = repbox_fp_steps(reg_classify_static = TRUE)
+  steps = repbox_fp_steps(tab_given = TRUE)
+  project_dirs = repboxExplore::get_project_dirs("~/repbox/projects_share")
+  #project_dir = project_dirs[1]
+  for (project_dir in project_dirs) {
+    cat("\n", project_dir, "\n")
+    repbox_run_fp(project_dir,steps, overwrite = FALSE)
+  }
+  
+  repbox_rerun_outages(project_dirs,steps = steps,max_repeat = 5, sleep_sec = 30)
+
+  
+  repbox_error_ver_dirs(project_dirs, steps)
+  repbox_outage_ver_dirs(project_dirs, steps)
+  
+
+  library(repboxAI)
+  library(aikit)
+  rgemini::set_gemini_api_key(file = "~/repbox/gemini/gemini_api_key.txt")
+  set_ai_opts(model = "gemini-2.0-flash-thinking-exp")
+  set_ai_opts(model = "gemini-2.5-pro-exp-03-25")
+  set_ai_opts(model = "gemini-2.0-flash")
+  parent_dir = "~/repbox/projects_share"
+  project_dirs = repboxExplore::get_project_dirs("~/repbox/projects_share")
+  repbox_rerun_outages(project_dirs,max_repeat = 5, sleep_sec = 30)
+  
+    
+  repbox_run_fp(project_dir,steps)
+  rstudioapi::filesPaneNavigate(project_dir)
+  
+  project_dirs = repboxExplore::get_project_dirs("~/repbox/projects_share")
+  
+}
+
+repbox_fp_join_steps = function(...) {
+  step_li = list(...)
+  restore.point("repbox_fp_join_steps")
+  steps = do.call(c,step_li)
+  all_steps = c(repbox_fp_steps_from(), repbox_fp_readme_steps_from())
+  all_steps[names(steps)] = steps
+  all_steps
+}
+
+repbox_fp_steps_base = function() {
+  repbox_fp_steps_from(tab_given=TRUE,by_tab_classify = FALSE)
+}
+
+repbox_fp_steps_advanced = function() {
+  repbox_fp_steps_from(map_reg_static = TRUE)
+}
+
+repbox_fp_readme_steps_from = function(readme_overview=FALSE, readme_var=readme_overview, readme_script_tab_fig = readme_var, readme_data=readme_script_tab_fig, readme_vs_guide=readme_data) {
+  as.list(sys.frame(sys.parent(0)))  
+}
+
+repbox_fp_readme_steps = function(readme=FALSE, readme_overview=FALSE, readme_var=FALSE, readme_script_tab_fig = FALSE, readme_data=FALSE, readme_vs_guide=FALSE) {
+  as.list(sys.frame(sys.parent(0)))  
+}
+
+repbox_fp_steps = function(tab_given=FALSE, tab_notes_pdf=FALSE, tab_html_pdf=FALSE, tab_main=FALSE, ev_tab=FALSE, tab_classify = FALSE, by_tab_classify = FALSE, by_tab_classify_nodoc=FALSE, map_reg_static = FALSE, reg_classify_static=FALSE, map_reg_run=FALSE, map_inv_reg_run=FALSE) {
+  as.list(sys.frame(sys.parent(0)))
+}
+
+
+repbox_fp_steps_from = function(tab_given=FALSE, tab_notes_pdf=tab_given, tab_html_pdf=tab_notes_pdf, tab_main=tab_html_pdf, ev_tab=tab_main,  tab_classify = ev_tab, by_tab_classify = FALSE, by_tab_classify_nodoc=FALSE, map_reg_static = by_tab_classify_nodoc | tab_classify, reg_classify_static=map_reg_static, map_reg_run = reg_classify_static, map_inv_reg_run = map_reg_run) {
+  as.list(sys.frame(sys.parent(0)))
+}
+
+repbox_run_fp = function(project_dir, steps = repbox_fp_steps_from(TRUE), overwrite=FALSE, overwrite_hx = overwrite, doc_type = NULL, to_v0 = TRUE) {
+  restore.point("repbox_run_fp")
+  org_steps = steps
+  steps = repbox_fp_join_steps(steps)
+  all_doc_types = repbox_doc_types(project_dir)
+  if (!is.null(doc_type)) {
+    doc_type = intersect(doc_type, all_doc_types)
+  } else {
+    doc_type = all_doc_types
+  }
+  if (steps$tab_given) {
+    proc_tab_given(project_dir, doc_type=doc_type)
+  }
+  pdf_doc_dirs = repbox_doc_dirs(project_dir, doc_form="pdf", doc_type=doc_type)
+  if (steps$tab_notes_pdf) {
+    proc_tab_notes_from_pdf(project_dir, doc_type=doc_type, overwrite = overwrite)
+  }
+  if (steps$tab_html_pdf) {
+    proc_tab_html_from_pdf(project_dir,doc_type = doc_type, overwrite=overwrite)
+  }
+  if (steps$tab_main) {
+    proc_tab_main(project_dir, overwrite=overwrite)
+  }
+  
+  if (steps$ev_tab) {
+    for (dt in doc_type) {
+      repbox_ev_tab(project_dir, doc_type=dt)
+    }
+  }
+  if (steps$readme_overview) {
+    proc_readme(project_dir,"readme_overview", overwrite=overwrite)
+  }
+  if (steps$readme_var) {
+    proc_readme(project_dir,"readme_var", overwrite=overwrite)
+  }
+  if (steps$readme_script_tab_fig) {
+    proc_readme(project_dir,"readme_script_tab_fig", overwrite=overwrite)
+  }
+  if (steps$readme_data) {
+    proc_readme(project_dir,"readme_data", overwrite=overwrite)
+  }
+  if (steps$readme_vs_guide) {
+    proc_readme(project_dir,"readme_vs_guide", overwrite=overwrite)
+  }
+
+  if (steps$tab_classify) {
+    for (dt in doc_type) {
+      pru = 
+        rai_pru_base(project_dir, "tab_classify",tpl_id = "tab_classify", doc_type=dt, overwrite=overwrite, to_v0 = to_v0) %>%
+        rai_pru_add_doc() %>%
+        rai_pru_add_tab_df() #%>%
+        #rai_pru_add_tab_media(by_tab = FALSE, add_ref = FALSE) 
+      proc_rai_pru(pru)
+    }
+  }
+  if (steps$by_tab_classify) {
+    for (dt in doc_type) {
+      pru = 
+        rai_pru_base(project_dir, "tab_classify",tpl_id = "by_tab_classify", doc_type=dt, overwrite=overwrite, proc_postfix = "_bytab", to_v0 = to_v0) %>%
+        rai_pru_add_doc() %>%
+        rai_pru_add_tab_df(by_tab = TRUE) %>%
+        rai_pru_add_tab_media(by_tab = TRUE, add_ref = TRUE) 
+      proc_rai_pru(pru)
+    }
+  }
+  if (steps$by_tab_classify_nodoc) {
+    for (dt in doc_type) {
+      pru = 
+        rai_pru_base(project_dir, "tab_classify",tpl_id = "by_tab_classify_nodoc", proc_postfix = "_bytab_nodoc", doc_type=dt, overwrite=overwrite, to_v0 = to_v0) %>%
+        rai_pru_add_tab_df(by_tab = TRUE) %>%
+        rai_pru_add_tab_media(by_tab = TRUE, add_ref = TRUE) 
+      proc_rai_pru(pru)
+    }
+  }
+  dt = first(doc_type)
+  if (steps$map_reg_static) {
+    for (dt in doc_type) {
+      pru = 
+        rai_pru_base(project_dir, "map_reg_static", doc_type=dt, overwrite=overwrite, to_v0 = to_v0) %>%
+        rai_pru_add_doc() %>%
+        rai_pru_add_tab_df() %>%
+        rai_pru_add_tab_media(in_context=FALSE) %>%
+        rai_pru_add_static_do()
+      proc_rai_pru(pru)
+    }
+  }
+  if (steps$reg_classify_static) {
+    for (dt in doc_type) {
+      cat("\nreg_classify_static for", dt, "of", project_dir, "\n")
+      pru = 
+        rai_pru_base(project_dir, "reg_classify_static", doc_type=dt, overwrite=overwrite, to_v0 = to_v0) %>%
+        rai_pru_add_doc() %>%
+        rai_pru_add_tab_df() %>%
+        rai_pru_add_reg_list_static(filter_tab_df = TRUE) %>%
+        rai_pru_add_tab_media(in_context=FALSE)
+      
+      proc_rai_pru(pru)
+    }
+  }
+  if (steps$map_reg_run) {
+    for (dt in doc_type) {
+      pru = 
+        rai_pru_base(project_dir, "map_reg_run", doc_type=dt, overwrite=overwrite, to_v0 = to_v0) %>%
+        rai_pru_add_doc() %>%
+        rai_pru_add_tab_df() %>%
+        rai_pru_add_tab_media(in_context=FALSE) %>%
+        rai_pru_add_run_do(in_context = FALSE)
+      proc_rai_pru(pru)
+    }
+  }
+  if (steps$map_inv_reg_run) {
+    restore.point("proc_map_inv_reg_run")
+    for (dt in doc_type) {
+      pru = 
+        rai_pru_base(project_dir, "map_inv_reg_run", doc_type=dt, overwrite=overwrite, to_v0 = to_v0) |>
+        rai_pru_add_reg_df()
+      # no regressions successfully run. we don't perform a mapping
+      if (NROW(pru[["reg_df"]])==0) {
+        next
+      }
+      pru = pru |>
+        rai_pru_add_doc() |>
+        rai_pru_add_tab_df() |>
+        rai_pru_add_tab_media(in_context=FALSE) |>
+        rai_pru_add_run_do(in_context = FALSE,only_reg_df_output = TRUE)
+      proc_rai_pru(pru)
+    }
+  }
+
+  
+}
+
+repbox_error_ver_dirs = function(project_dirs, steps = repbox_fp_steps_from(TRUE)) {
+  restore.point("repbox_error_ver_dirs")
+  parent_dirs = file.path(project_dirs, "fp") 
+  ver_dirs = NULL
+  if (steps$tab_notes_pdf) {
+    ver_dirs = union(ver_dirs, fp_all_error_ver_dirs(parent_dirs, "tab_notes"))
+  }
+  if (steps$tab_html_pdf) {
+    ver_dirs = union(ver_dirs, fp_all_error_ver_dirs(parent_dirs, "tab_html"))
+  }
+  if (steps$readme) {
+    ver_dirs = union(ver_dirs, fp_all_error_ver_dirs(parent_dirs, "readme_overview"))
+  }
+  ver_dirs
+} 
+
+repbox_fp_steps_to_names = function(steps) {
+  names(steps[unlist(steps)])
+}
+
+repbox_outage_ver_dirs = function(project_dirs, steps = repbox_fp_steps_from(TRUE)) {
+  restore.point("repbox_outage_ver_dirs")
+  parent_dirs = file.path(project_dirs, "fp") 
+  step_names = repbox_fp_steps_to_names(steps)
+  ver_dirs = NULL
+  ver_dirs = union(ver_dirs, fp_all_outage_ver_dirs(parent_dirs, step_names))
+  
+  if (steps$tab_notes_pdf) {
+    ver_dirs = union(ver_dirs, fp_all_outage_ver_dirs(parent_dirs, "tab_notes"))
+  }
+  if (steps$tab_html_pdf) {
+    ver_dirs = union(ver_dirs, fp_all_outage_ver_dirs(parent_dirs, "tab_html"))
+  }
+  if (steps$tab_classify | steps$by_tab_classify | steps$by_tab_classify_nodoc) {
+    ver_dirs = union(ver_dirs, fp_all_outage_ver_dirs(parent_dirs, "tab_classify"))
+  }
+  ver_dirs
+}  
+
+repbox_rerun_outages = function(project_dirs, steps = repbox_fp_steps_from(TRUE), max_repeat=0, sleep_sec = 30) {
+  restore.point("repbox_rerun_outages")
+  steps = repbox_fp_join_steps(steps)
+  ver_dirs = repbox_outage_ver_dirs(project_dirs, steps)
+  cat(paste0("\n", length(ver_dirs), " outages found.\n\n"))
+  if (length(ver_dirs)==0) return(NULL)
+  
+  rem_ver_dirs = ver_dirs
+  counter = 0
+  while(counter <= max_repeat) {
+    counter = counter+1
+    fp_rerun_all_outage_ver(ver_dirs=rem_ver_dirs)
+    rem_ver_dirs = repbox_outage_ver_dirs(project_dirs, steps)
+    if (length(rem_ver_dirs)==0 | counter > max_repeat) break
+    cat(paste0("\n\n", length(rem_ver_dirs), " remaining outages.\nSleep for ", sleep_sec, " sec...\n"))
+    Sys.sleep(sleep_sec)
+  }
+  invisible(ver_dirs)
+}
+
+repbox_rerun_errors = function(project_dirs, steps = repbox_fp_steps_from(TRUE)) {
+  restore.point("repbox_rerun_errors")
+  ver_dirs = repbox_error_ver_dirs(project_dirs, steps)
+  if (length(ver_dirs)==0) return(NULL)
+  fp_rerun_all_error_ver(ver_dirs=ver_dirs)
+  invisible(ver_dirs)
+}
+
+fp_count_prods = function(parent_dir) {
+  ver_dirs = fp_all_ver_dirs(parent_dir)
+  
+  df = tibble(
+    ver_dir = fp_all_ver_dirs(parent_dir),
+    proc_dir = fp_ver_dir_to_proc_dir(ver_dir),
+    prod_dir = fp_proc_dir_to_prod_dir(proc_dir),
+    proc_id = fp_proc_dir_to_proc_id(proc_dir),
+    prod_id = fp_prod_dir_to_prod_id(prod_dir),
+    fp_dir = fp_prod_dir_to_fp_dir(prod_dir)
+  )
+  
+  prod_df = df %>%
+    group_by(prod_id) %>%
+    summarize(num_fp = n_distinct(fp_dir))
+  
+  proc_df = df %>%
+    group_by(prod_id, proc_id) %>%
+    summarize(num_fp = n_distinct(fp_dir))
+  
+  
+  prod_ids = fp_ver_dir_to_prod_id(ver_dirs) 
+  
+}
+
+fp_find_missing_prod = function(parent_dir, prod_id=NULL) {
+  parent_dir = "~/repbox/projects_share"
+  restore.point("fp_find_missing_prod")
+  ver_dirs = fp_all_ver_dirs(parent_dir)
+  if (is.null(prod_id))
+    prod_ids = fp_ver_dir_to_prod_id(ver_dirs) 
+  
+    
+}
+```
+# END OF FILE: proc_all.R
+
+-----------------------------------------------------------
+
+
+# FILE: proc_cell.R
+```
+example = function() {
+  
+  project_dir = "~/repbox/projects_share/aejapp_1_2_4"
+  proc_all_tab_html_to_cell_list(project_dir, overwrite=TRUE)
+  proc_all_cell_list_to_cell_base(project_dir, overwrite=TRUE)
+  
+  project_dirs = list.dirs("~/repbox/projects_share", full.names = TRUE,recursive = FALSE)
+  proc_all_tab_html_to_cell_list(paste0(project_dirs,"fp"))
+  proc_all_cell_list_to_cell_base(paste0(project_dirs,"fp"))
+  
+  ver_dir = "~/repbox/projects_share/aejapp_1_2_4/rai/prod_runs/tab_html/raw_tab_html-n-g2f-0/v0"
+  
+  parent_dir = "~/repbox/projects_share/aeri_1_2_6"
+  proc_raw_tab_html_to_cell_base(ver_dir = ver_dir)
+  
+  rstudioapi::filesPaneNavigate(project_dir)
+  
+  
+}
+
+proc_all_tab_html_to_cell_list = function(project_dir, overwrite=FALSE) {
+  ddp_derive_all_instances(project_dir, from_prod_id = "tab_html", to_prod_id = "cell_list",convert_fun = proc_tab_html_to_cell_list, overwrite=overwrite)
+}
+
+proc_all_tab_html_to_cell_list = function(project_dir, overwrite=FALSE) {
+  ddp_derive_all_instances(project_dir, from_prod_id = "tab_html", to_prod_id = "cell_list",convert_fun = proc_tab_html_to_cell_list, overwrite=overwrite)
+}
+
+proc_all_raw_tab_html_to_cell_base = function(parent_dir) {
+  restore.point("proc_all_raw_tab_html_to_cell_base")
+  ver_dirs = fp_all_ver_dirs(parent_dir)
+  proc_ids = fp_ver_dir_to_proc_id(ver_dirs)
+  ver_dirs = ver_dirs[startsWith(proc_ids, "raw_tab_html")]
+  for (ver_dir in ver_dirs) {
+    proc_raw_tab_html_to_cell_base(ver_dir=ver_dir)
+  }
+}
+
+proc_raw_tab_html_to_cell_base = function(org_pru=NULL, ver_dir=org_pru$ver_dir, tab_df = org_pru$prod_df) {
+  restore.point("proc_raw_tab_html_to_cell_base")
+  if (is.null(org_pru)) {
+    org_pru = readRDS(file.path(ver_dir, "pru.Rds"))
+  }
+  prod_id = "cell_base"
+  proc_id = str.right.of(org_pru$proc_id,"raw_")
+  pru = ddp_init_pru(org_pru, ver_dir=ver_dir,ddp_prod_id=prod_id, ddp_proc_id = proc_id)
+  if (is.null(tab_df)) {
+    tab_df = fp_load_prod_df(ver_dir=org_pru$ver_dir)
+  }
+  
+  i = 1
+  cell_df = bind_rows(lapply(seq_len(NROW(tab_df)), function(i) {
+    restore.point("shkfjhksfdo")
+    cell_df = normalized_html_tab_to_cell_df(tab_df$tabhtml[[i]], tab_df$tabid[[i]])
+    cell_df = cells_add_cell_base(cell_df,split_multi_num = TRUE)
+    cell_df      
+  }))
+  prod = repbox_prod("cell_base")
+  prod_df = df_to_prod_df(cell_df, prod)
+  pru = pru_save(pru,prod_df)
+
+  pru_backport_save(pru, repbox_prod("cell_list"),prod_df)
+  cell_df$content = cell_df$text
+  cell_li = split(cell_df, cell_df$tabid)
+  tab_df$tabhtml =  sapply(cell_li, cell_df_to_simple_tabhtml)
+  tab_pru = pru_backport_save(pru, repbox_prod("tab_html"), tab_df)
+  # rstudioapi::filesPaneNavigate(tab_pru$ver_dir)
+  rai_write_all_tables_html(tab_df, "tables.html", out_dir=tab_pru$ver_dir, info=tab_pru$proc_info)
+  invisible(pru)
+  
+}
+
+
+# cell_list is a derived prod of tab_html
+proc_tab_html_to_cell_list = function(pru=NULL, ver_dir=pru$ver_dir, prods=repbox_prods(), prod_df=pru$prod_df, also_cell_base=FALSE) {
+  restore.point("proc_tab_html_to_cell_list")
+  prod = prods[["cell_list"]]
+  df = fp_load_prod_df(ver_dir=ver_dir, prod_df=prod_df)
+
+  pru = ddp_init_pru(pru, ver_dir=ver_dir,ddp_prod_id="cell_list")
+  i = 1
+  cell_df = bind_rows(lapply(seq_len(NROW(df)), function(i) {
+    restore.point("shkfjhksfdo")
+    cell_df = normalized_html_tab_to_cell_df(df$tabhtml[[i]], tabid=df$tabid[i])
+    cell_df = add_col_left(cell_df,otabid = df$otabid[i])
+    cell_df      
+  }))
+  prod_df = df_to_prod_df(cell_df, prod)
+  pru = pru_save(pru,prod_df)
+  
+  if (also_cell_base) {
+    pru = proc_cell_list_to_cell_base(pru)
+  }
+  #rstudioapi::filesPaneNavigate(pru$ver_dir)
+  invisible(pru)
+  
+}
+
+
+proc_all_cell_list_to_cell_base = function(project_dir, overwrite=FALSE) {
+  restore.point("proc_all_cell_list_to_cell_base")
+  ddp_derive_all_instances(project_dir, from_prod_id = "cell_list", to_prod_id = "cell_base",convert_fun = proc_cell_list_to_cell_base, overwrite=overwrite)
+}
+
+
+proc_cell_list_to_cell_base = function(pru=NULL, ver_dir=pru$ver_dir, prods=repbox_prods(), prod_df=pru$prod_df) {
+  restore.point("proc_cell_list_to_cell_base")
+  cell_df = fp_load_prod_df(ver_dir=ver_dir, prod_df=prod_df)
+  prod = repbox_prod("cell_base", prods)
+  pru = ddp_init_pru(pru, ver_dir=ver_dir,ddp_prod_id="cell_base")
+  prod_df = cell_list_to_cell_base_prod(cell_df, prod=prod)
+  pru = pru_save(pru,prod_df)
+  #rstudioapi::filesPaneNavigate(pru$ver_dir)
+  invisible(pru)  
+}
+
+
+cell_list_to_cell_base_prod = function(cell_list, prod=repbox_prods()[["cell_base"]]) {
+  restore.point("cell_list_to_cell_base_prod")
+  # From repboxTableTools
+  cell_df = cells_add_cell_base(cell_list)
+  df_to_prod_df(cell_df,  prod)
+}
+```
+# END OF FILE: proc_cell.R
+
+-----------------------------------------------------------
+
+
+# FILE: proc_info.R
+```
+# Repbox AI process infos
+
+rai_make_proc_info = function(prod_id, ai_opts,tpl_file=NA,json_mode=TRUE, use_schema=FALSE, raw=FALSE,tpl_id=NULL,doc_file_form=NULL, proc_prefix="",proc_postfix = "",  ...) {
+  schema_opt = case_when(
+    use_schema ~ "s",
+    json_mode ~ "j",
+    TRUE ~ "n"
+  )
+  schema_opt_str = ifelse(schema_opt=="s", "s","")
+  temp_str = ifelse(is.true(ai_opts$temperature > 0), paste0("t",round(10*ai_opts$temperature,0)),"")
+  model_short = rai_model_short(ai_opts$model)
+  proc_id = paste0(proc_prefix,model_short,schema_opt_str, temp_str, proc_postfix)
+  if (raw) {
+    proc_id = paste0("raw_", proc_id)
+  }
+  extra_args = list(...)
+  restore.point("repbox_ai_version")
+  if (length(extra_args)>0) {
+    extra_str = do.call(paste, c(extra_args, list(sep="-")))
+    proc_id = paste0(proc_id, "-", extra_str)
+  }
+  proc_info = c(list(proc_id=proc_id, prod_id=prod_id,model=ai_opts$model,model_short = model_short, temperature=ai_opts$temperature, tpl_id=null_to_na(tpl_id), tpl_file=tpl_file, tpl_base = basename(tpl_file), json_mode=json_mode, use_schema=use_schema, raw=raw), doc_file_form=null_to_na(doc_file_form), extra_args)
+  proc_info = as_tibble(proc_info)
+  proc_info
+}
+
+```
+# END OF FILE: proc_info.R
+
+-----------------------------------------------------------
+
+
+# FILE: proc_readme.R
+```
+# Parse tab_base
+
+example = function() {
+  library(repboxAI)
+  rgemini::set_gemini_api_key(file = "~/repbox/gemini/gemini_api_key.txt")
+  set_ai_opts(model = "gemini-2.0-flash-thinking-exp")
+  set_ai_opts(model = "gemini-2.0-flash")
+  get_ai_opts()
+  project_dir = "~/repbox/projects_share/aejapp_1_2_4"
+  project_dir = "~/repbox/projects_share/aeri_1_2_6"
+  
+  res = proc_readme(project_dir,"readme_overview", overwrite=FALSE)
+  res = proc_readme(project_dir,"readme_var", overwrite=FALSE)
+  res = proc_readme(project_dir,"readme_script_tab_fig", overwrite=FALSE)
+  res = proc_readme(project_dir,"readme_data", overwrite=FALSE)
+  res = proc_readme(project_dir,"readme_data_descr", overwrite=!FALSE)
+  
+  rstudioapi::filesPaneNavigate(project_dir)
+  rstudioapi::filesPaneNavigate(res$ver_dir)
+  
+  # Analyse readme overview
+  project_dirs = repboxExplore::get_project_dirs("~/repbox/projects_share")
+  readme_df = fp_pick_and_load_prod_df(project_dirs,prod_id = "readme_overview")
+  df = fp_pick_and_load_prod_df(project_dirs,prod_id = "readme_data")
+  df = fp_pick_and_load_prod_df(project_dirs,prod_id = "readme_data_descr")
+  
+}
+
+#' Extracts tab_html from articles
+proc_readme = function(project_dir, prod_id = c("readme_overview","readme_var","readme_tabfig")[1], ai_opts = get_ai_opts(), verbose=TRUE, to_v0=TRUE, use_schema = FALSE, overwrite=TRUE, max_readme_rank=1) {
+  restore.point("proc_readme")
+  library(repboxReadme)
+  readme_df = repbox_load_or_make_readme_ranks(project_dir)
+  if (NROW(readme_df)==0) {
+    cat("\nNo readme files found for ", project_dir, ".\n")
+    return(NULL)
+  }
+  readme_df = readme_df %>% filter(!ignore) %>% filter(rank <= max_readme_rank)
+  fp_dir = file.path(project_dir, "fp", "readme") 
+  
+  tpl_file = file.path(rai_tpl_dir(), paste0(prod_id,".txt"))
+  
+  proc_info = rai_make_proc_info(prod_id=prod_id,ai_opts = ai_opts,tpl_file = tpl_file, json_mode=TRUE, use_schema = use_schema)
+  
+  pru = pru_init(fp_dir,prod_id,proc_info=proc_info,to_v0=to_v0)
+  
+  pru$max_readme_rank = max_readme_rank
+  pru$readme_df = readme_df
+  pru$project_dir = project_dir
+  if (!overwrite) if (fp_ver_dir_ok(pru$ver_dir)) return(NULL)
+  pru_next_stage(pru, "pru_readme_run")
+}
+
+pru_readme_run = function(pru) {
+  restore.point("pru_readme_run")
+  project_dir = pru$project_dir
+  df = pru$readme_df
+  row = 1
+  pru = pru_make_items(pru, df=df, function(row, pru,...) {
+    restore.point("pru_readme_overview_run_inner")
+    readme_file = file.path(project_dir, "readme", "txt", df$txt_file[row])
+    rai = rai_init(project_dir,proc_info = pru$proc_info,media_files = readme_file)
+    values = list(readme_file = basename(df$org_file[row]))
+    res = ai_run(rai, values=values)
+    res
+  })
+  pru = pru_set_status(pru, pru$items)
+  restore.point("pru_readme_run")
+  if (!pru_is_ok(pru)) return(invisible(pru))
+  
+  prod = repbox_prod(pru$prod_id)
+  res_df = ai_combine_content_df(pru$items, df %>% select(readme_file = org_file),schema = prod_to_schema(prod, "arr"))
+  prod_df = df_to_prod_df(res_df, repbox_prod(pru$prod_id))
+  pru_save(pru, prod_df)
+  return(invisible(pru))
+}
+```
+# END OF FILE: proc_readme.R
+
+-----------------------------------------------------------
+
+
+# FILE: proc_tab_from_pdf.R
+```
+# Parse tab_base
+
+example = function() {
+  library(repboxAI)
+  rgemini::set_gemini_api_key(file = "~/repbox/gemini/gemini_api_key.txt")
+  set_ai_opts(model = "gemini-1.5-flash-001")
+  set_ai_opts(model = "gemini-2.0-flash-thinking-exp")
+  set_ai_opts(model = "gemini-2.0-flash-lite")
+  set_ai_opts(model = "gemini-2.0-flash")
+  get_ai_opts()
+  project_dir = "~/repbox/projects_share/aejapp_1_2_4"
+  project_dir = "~/repbox/projects_share/aejapp_1_2_7"
+  project_dir = "~/repbox/projects_share/ecta_84_2_6"
+  project_dir = "~/repbox/projects_share/jeea_12_1_11"
+  project_dir = "~/repbox/projects_share/aeri_1_2_6"
+    
+  res = proc_tab_html_from_pdf(project_dir, doc_type="app1", overwrite=FALSE)
+  
+  res = proc_tab_notes_from_pdf(project_dir, overwrite=FALSE)
+  
+  rstudioapi::filesPaneNavigate(project_dir)
+  rstudioapi::filesPaneNavigate(res$ver_dir)
+}
+
+proc_tab_html_from_pdf = function(project_dir, doc_type = NULL, overwrite=FALSE, ...) {
+  doc_dirs = repbox_doc_dirs(project_dir,doc_form = "pdf", doc_type=doc_type)
+  
+  
+  for (doc_dir in doc_dirs) {
+    cat(paste0("\nExtract tables from PDF in ", doc_dir,"\n"))
+    proc_doc_tab_html_from_pdf(doc_dir,overwrite=overwrite, ...)
+  }
+}
+
+#' Extracts tab_html from articles
+proc_doc_tab_html_from_pdf = function(doc_dir, tpl_num=1,prods=repbox_prods(), ai_opts = get_ai_opts(), verbose=TRUE, to_v0=TRUE, overwrite=TRUE) {
+  restore.point("proc_doc_tab_html_from_pdf")
+  if (!rai_has_input(doc_dir, "pdf","tab_list")) return(NULL)
+  
+  doc_type = rdoc_type(doc_dir)
+  fp_dir = doc_dir_to_fp_dir(doc_dir)
+  project_dir = rai_fp_dir_to_project_dir(fp_dir)
+  
+  
+  prod_id = "tab_html"
+  doc_form = "pdf"
+  tpl_file = file.path(rai_tpl_dir(), paste0(prod_id, "-", doc_form, "-", tpl_num, ".txt"))
+  
+  proc_info = rai_make_proc_info(prod_id=prod_id,ai_opts = ai_opts,tpl_file = tpl_file, json_mode=FALSE, use_schema = FALSE, raw=TRUE, proc_prefix = "pdf-")
+
+  
+  
+  pru = pru_init(fp_dir,prod_id,proc_info=proc_info,to_v0=to_v0)
+  
+  if (!overwrite) if (fp_ver_dir_ok(pru$ver_dir)) return(NULL)
+
+  # Prefer following table lists:
+  # 1. extracted with same model
+  # 2. mocr
+  proc_postfix = str.right.of(proc_info$proc_id,"-") %>% str.right.of("-")
+  proc_ids = fp_all_proc_id(fp_dir, "tab_list")
+  input_pref = fp_pref(proc_id = c(
+    proc_ids[endsWith(proc_ids, proc_postfix)],
+    proc_ids[endsWith(proc_ids, "_mocr")]  
+  ))
+  pru = pru_pick_inputs(pru, "tab_list", input_pref)
+  if (pru_has_input_err(pru)) return(pru)
+
+  context = rai_context(project_dir,doc_type_pdf = doc_type)
+  pru$rai = rai_init(fp_dir, context=context, proc_info=proc_info, ai_opts=ai_opts)
+  pru_next_stage(pru, "pru_tab_html_pdf_run")
+}
+
+pru_tab_html_pdf_run = function(pru) {
+  restore.point("pru_tab_html_pdf_ai_run")
+  df = pru_get_input(pru, "tab_list")
+  pru = pru_make_items(pru, df=df, function(row, pru,...) {
+    values = as.list(df[row,])
+    ai_run(pru$rai, values=values)
+  })
+  pru = pru_set_status(pru, pru$items)
+  restore.point("pru_post_run")
+  if (!pru_is_ok(pru)) return(invisible(pru))
+
+  df$raw_html = ai_combine_content_str(pru$items,err_val = NA_character_)
+  df$tabhtml = sapply(seq_len(NROW(df)), function(i) {
+    html_table_add_cellnum_row_col(df$raw_html[i],tabid=df$tabid[i])
+  })
+  prod_df = df_to_prod_df(df, repbox_prod("tab_html"))
+  pru_save(pru, prod_df)
+  rai_write_all_tables_html(prod_df, "tables.html", out_dir=pru$ver_dir, info=pru$proc_info)
+  
+  proc_raw_tab_html_to_cell_base(pru, tab_df = prod_df)
+  
+  #rstudioapi::filesPaneNavigate(pru$ver_dir)
+  
+  return(invisible(pru))
+  
+}
+
+proc_tab_notes_from_pdf = function(project_dir, doc_type=NULL, overwrite=FALSE,...) {
+
+  doc_dirs = repbox_doc_dirs(project_dir,doc_form = "pdf", doc_type=doc_type)
+  
+  for (doc_dir in doc_dirs) {
+    cat(paste0("\nExtract tables from PDF in ", doc_dir,"\n"))
+    proc_doc_tab_notes_from_pdf(doc_dir,overwrite=overwrite, ...)
+  }
+  
+}
+
+
+
+#' Extracts tab_list and tab_notes from articles
+proc_doc_tab_notes_from_pdf = function(doc_dir, tpl_num=1,use_schema=FALSE, to_v0=TRUE, ai_opts = get_ai_opts(), overwrite=TRUE) {
+  if (!rai_has_input(doc_dir, "pdf")) return(NULL)
+  
+  fun_call = preserve_call("proc_doc_tab_notes_from_pdf")
+  restore.point("proc_doc_tab_notes_from_pdf")
+  
+  doc_type = rdoc_type(doc_dir)
+  prod_id = "tab_notes"
+  art_source = "pdf"
+  tpl_file = file.path(rai_tpl_dir(), paste0(prod_id, "-", art_source, "-", tpl_num, ".txt"))
+
+  proc_info = rai_make_proc_info(prod_id=prod_id,ai_opts = ai_opts,tpl_file = tpl_file, json_mode=TRUE, use_schema = use_schema,proc_prefix = "pdf-")
+  
+  fp_dir = doc_dir_to_fp_dir(doc_dir)
+  project_dir = rai_fp_dir_to_project_dir(fp_dir)
+  pru = pru_init(fp_dir,prod_id,proc_info=proc_info,to_v0=to_v0, fun_call=fun_call)
+  
+  if (!overwrite) if (fp_ver_dir_ok(pru$ver_dir)) return(NULL)
+  
+  # In the prompt we name variables differently to make it easier for AI
+  schema = NULL
+  pru$prod_to_df_cols = c(table_number="tabid",table_title="tabtitle", table_notes="tabnotes")
+  if (use_schema) {
+    schema = prod_to_schema(prod, "arr") %>%
+      schema_reduce(pru$prod_to_df_cols)
+  }
+  context = rai_context(project_dir,doc_type_pdf = doc_type)
+  pru$rai = rai_init(project_dir, proc_info = proc_info, schema=schema, context=context)
+  
+  pru$rai = rai_run(pru$rai)
+  restore.point("proc_doc_tab_notes_from_pdf_post_run")
+  
+  
+  pru = pru_set_status(pru, pru$rai)
+  if (!pru_is_ok(pru)) return(invisible(pru))
+  prod = repbox_prod(prod_id)
+  prod_df = df_to_prod_df(pru$rai$content, prod, prod_to_df_cols = pru$prod_to_df_cols)
+  # Deal with continued tables
+  prod_df = prod_df %>%
+    mutate(
+      merge_above = 
+      is.true(lag(tabid)==tabid) |
+      (is.true(has.substr(tabtitle, "ontinue") & is.na(tabid)))
+    )
+  rows = which(prod_df$merge_above)
+  for (r in rows) {
+    if (r==1) next
+    prod_df$tabnotes[r-1] = paste0(prod_df$tabnotes[r-1],"\n",prod_df$tabnotes[r])
+  }    
+  prod_df = prod_df[!is.na(prod_df$tabid)&!prod_df$merge_above,]
+  prod_df = prod_df[, setdiff(colnames(prod_df),"merge_above")]
+  
+  old_tabid = prod_df$tabid
+  prod_df$tabid = tabid_normalize(prod_df$tabid)
+  if (!all(old_tabid==prod_df$tabid)) {
+    pru = pru_add_issue(pru, "tabid_was_standardized")
+  }
+  
+  prod_df$otabid = tabid_to_otabid(prod_df$tabid)
+  pru = pru_save(pru, prod_df)
+  
+  pru_backport_save(pru, repbox_prod("tab_list"), prod_df=prod_df)
+  rstudioapi::filesPaneNavigate(pru$ver_dir)
+  return(invisible(pru))
+}
+
+
+```
+# END OF FILE: proc_tab_from_pdf.R
+
+-----------------------------------------------------------
+
+
+# FILE: proc_tab_given.R
+```
+# Use tables already (heuristically) extracted by repboxDoc and stored
+# in corresponding table_df.Rds in doc_dir
+
+example = function() {
+  library(repboxAI)
+  rgemini::set_gemini_api_key(file = "~/repbox/gemini/gemini_api_key.txt")
+  project_dir = "~/repbox/projects_share/aejapp_1_2_4"
+  project_dir = "~/repbox/projects_share/aejapp_1_2_7"
+  project_dir = "~/repbox/projects_share/ecta_84_2_6"
+  project_dir = "~/repbox/projects_share/jeea_12_1_11"
+  project_dir = "~/repbox/projects_share/jep_31_1_2"
+  project_dir = "~/repbox/projects_share/jole_33_3_5"
+  project_dir = "~/repbox/projects_share/jpe_123_4_4"
+  project_dir = "~/repbox/projects_share/ms_65_10_17"
+  project_dir = "~/repbox/projects_share/qje_3036349" # hx wrong col align
+  project_dir = "~/repbox/projects_share/restat_2689366" 
+  project_dir = "~/repbox/projects_share/restud_82_2_12" 
+  project_dir = "~/repbox/projects_share/aeri_1_2_6"
+  
+  project_dir = "~/repbox/projects_share/restud_82_2_12" 
+  proc_tab_given(project_dir)
+  rstudioapi::filesPaneNavigate(project_dir)
+}
+
+proc_tab_given = function(project_dir, to_v0=TRUE, doc_form=NULL, doc_type=NULL) {
+  restore.point("proc_tab_given")
+  doc_dirs = repboxDoc::repbox_doc_dirs(project_dir,doc_form = doc_form, doc_type=doc_type)
+  doc_dir = first(doc_dirs)
+  for (doc_dir in doc_dirs) {
+    proc_doc_tab_given(doc_dir, to_v0=to_v0)
+  }
+}
+
+proc_doc_tab_given = function(doc_dir, to_v0=TRUE) {
+  restore.point("proc_doc_tab_given")
+  prod_id = "tab_main"; prod = repbox_prod(prod_id)
+  doc_form = rdoc_form(doc_dir)
+  
+  # Creates page_df.Rds, parts_df.Rds, tabs_df.Rds etc
+  # if already exists skips
+  rdoc_process(doc_dir,overwrite=FALSE)
+  
+  rdoc_is_processed(doc_dir)
+  
+  
+  df = readRDS.or.null(file.path(doc_dir, "tab_df.Rds"))
+
+  if (NROW(df)==0) return(NULL)
+  
+  just_raw=FALSE
+  proc_id = doc_form
+  if (doc_form=="html") {
+    # Changes content of all cells to pure text
+    df$raw_tabhtml = df$tabsource
+    df$raw_tabhtml = sapply(df$raw_tabhtml, html_table_cells_to_text)
+    just_raw = TRUE
+    
+  } else if (doc_form=="pdf") {
+    df$raw_tabhtml = df$tab_html
+    just_raw = TRUE
+    proc_id = "pdf_txt"
+  }
+  if (just_raw) {
+    df$raw_tabhtml <- stri_replace_all_fixed(df$raw_tabhtml, "\u2003", "")
+    df$tabhtml = sapply(seq_len(NROW(df)), function(i) {
+      html_table_add_cellnum_row_col(df$raw_tabhtml[i],tabid=df$tabid[i])
+    })
+  }
+  #proc_id = paste0("doc_", doc_form)
+  proc_info = data.frame(prod_id=prod_id, proc_id = proc_id, doc_form=doc_form)
+  fp_dir = doc_dir_to_fp_dir(doc_dir)
+  pru = pru_init(fp_dir,prod_id=prod_id, proc_info=proc_info, to_v0=to_v0)
+  prod_df = df_to_prod_df(df, prod)
+  old_tabid = prod_df$tabid
+  prod_df$tabid = tabid_normalize(prod_df$tabid)
+  if (!all(old_tabid==prod_df$tabid)) {
+    pru = pru_add_issue(pru,"tabid_was_standardized")
+  }
+  
+  prod_df$otabid = tabid_to_otabid(prod_df$tabid)
+  
+  # Don't save main: just save all backports...
+  #pru = pru_save(pru, prod_df)
+  pru_backport_save(pru, repbox_prod("tab_list"), prod_df)
+  if (doc_form != "mocr") {
+    pru_backport_save(pru, repbox_prod("tab_notes"), prod_df)
+  }
+  pru_backport_save(pru, repbox_prod("tab_html"), prod_df)
+  proc_tab_html_to_cell_list(pru=pru, prod_df=prod_df, also_cell_base = TRUE)
+  #rai_write_all_tables_html(prod_df, "tables.html",out_dir = pru$ver_dir)
+  #rstudioapi::filesPaneNavigate(pru$ver_dir)
+  invisible(pru)
+}
+
+# rdoc_process instead
+# 
+# # Think of what should be called by make_ejd
+# rdoc_prepare_hx = function(doc_dir) {
+#   doc_form = rdoc_form(doc_dir)
+#   if (doc_form=="mocr") {
+#     repboxDoc::rdoc_mocr_process(doc_dir)
+#   } else if (doc_form == "pdf") {
+#     rdoc_pdf_to_txt_pages(doc_dir)
+#     rdoc_pdf_pages_to_parts(doc_dir)
+#     rdoc_pdf_extract_tabs(doc_dir)
+#   } else if (doc_form == "html") {
+#     rdoc_html_to_parts(doc_dir) 
+#   }
+# }
+```
+# END OF FILE: proc_tab_given.R
+
+-----------------------------------------------------------
+
+
+# FILE: proc_tab_main.R
+```
+# tab_main combines tab_html and tab_notes
+# not all our extraction methods generate tab_html and tab_notes
+# in particular we have not yet included table notes extraction
+# for mocr (mistral ocr)
+
+# tab_main essentially just joins a tab_html and tab_notes
+# per default we take notes from the same process than tab_html
+# if it exists, otherwise we map the notes from our preferred AI 
+# notes extraction
+
+
+example = function() {
+  library(repboxAI)
+  project_dir = "~/repbox/projects_share/aeri_1_2_6"
+  project_dir = "~/repbox/projects_share/aejapp_1_2_4"
+  proc_tab_main(project_dir)
+  rstudioapi::filesPaneNavigate(project_dir)
+}
+
+proc_tab_main = function(project_dir, ver_ind = 0, overwrite=TRUE) {
+  restore.point("proc_tab_main")
+  fp_dirs = rai_fp_dirs(project_dir)
+  ver_dirs = fp_all_ver_dirs(fp_dirs, "tab_html", ver_ind=ver_ind)
+  
+  html_df = tibble(html_ver_dir = ver_dirs, proc_id = fp_ver_dir_to_proc_id(ver_dirs), fp_dir = fp_ver_dir_to_fp_dir(ver_dirs))
+
+  ver_dirs = fp_all_ver_dirs(fp_dirs, "tab_notes", ver_ind=ver_ind)
+  notes_df = tibble(notes_ver_dir = ver_dirs, proc_id = fp_ver_dir_to_proc_id(ver_dirs),  fp_dir = fp_ver_dir_to_fp_dir(ver_dirs))
+  
+  # 1. Create tab main for processes which are expected to use their own note extraction
+  sel_df = html_df %>% 
+    filter(startsWith(proc_id, "pdf-") | proc_id %in% c("html","pdf_txt")) %>%
+    left_join(notes_df, by=c("fp_dir","proc_id"))
+  for (i in seq_len(NROW(sel_df))) {
+    proc_one_tab_main(sel_df$fp_dir[i],sel_df$html_ver_dir[i], sel_df$notes_ver_dir[i], overwrite=overwrite)
+  }
+  
+  # 2. Create tab main for processes that use default tab notes
+  sel_df = html_df %>% 
+    filter(proc_id == "mocr")
+  i = 1
+  for (i in seq_len(NROW(sel_df))) {
+    proc_one_tab_main(sel_df$fp_dir[i],sel_df$html_ver_dir[i], overwrite=overwrite)
+  }
+
+}
+
+proc_one_tab_main = function(fp_dir, ver_dir_html=NULL, ver_dir_notes = NULL, to_v0=TRUE, overwrite=FALSE) {
+  restore.point("proc_one_main_tab")
+  add_notes_id=TRUE
+  if (is.null(ver_dir_notes)) {
+    add_notes_id = FALSE
+    ver_dir_notes = rai_pick_tab_ver(fp_dir, "tab_notes")$ver_dir
+  }
+  if (is.null(ver_dir_html)) {
+    ver_dir_html = rai_pick_tab_ver(fp_dir, "tab_html")$ver_dir
+  }
+  proc_id_notes = fp_ver_dir_to_proc_id(ver_dir_notes)
+  proc_id_html = fp_ver_dir_to_proc_id(ver_dir_html)
+  short_html = proc_id_html %>%
+    stri_replace_all_regex("(tab_html_doc_)|(cell_base-n-)|(_tab_html-n-)","")
+  short_notes = proc_id_notes %>%
+    stri_replace_all_regex("(tab_html_doc_)|(cell_base)|(tab_notes-j-)","")
+
+  proc_id = ifelse(short_html==short_notes | !add_notes_id, short_html, paste0(short_html, "-", short_notes))
+  
+  fp_dir = fp_ver_dir_to_fp_dir(ver_dir_html)
+  proc_dir = file.path(fp_dir, "tab_main",proc_id)
+  ver_dir = fp_proc_dir_to_new_ver_dir(proc_dir,to_v0 = to_v0)
+  if (!overwrite) {
+    if (fp_has_prod_df(ver_dir)) {
+      return(invisible())
+    }
+  }
+  
+  
+  tab_html = fp_load_prod_df(ver_dir_html)
+  tab_notes = fp_load_prod_df(ver_dir_notes)
+  df = left_join_overwrite(tab_html, tab_notes, by ="tabid")
+  prod_df = df_to_prod_df(df, repbox_prod("tab_main"))
+  fp_save_prod_df(prod_df, ver_dir)
+  rai_write_all_tables_html(prod_df, "tables.html",out_dir = ver_dir)
+  
+  invisible(list(ver_dir=ver_dir, prod_df=prod_df))
+}
+
+```
+# END OF FILE: proc_tab_main.R
+
+-----------------------------------------------------------
+
+
+# FILE: rai_debug.R
+```
+# Correct all prod_df classes
+
+example = function() {
+  parent_dir = "~/repbox/projects_share"
+  prod_id = proc_id = NULL
+  rai_correct_prod_df_classes(parent_dir)
+}
+
+rai_correct_prod_df_classes = function(parent_dir, prod_id=NULL, proc_id=NULL) {
+  restore.point("rai_correct_prod_df_classes")
+  ver_dirs = fp_all_ver_dirs(parent_dir, prod_id=prod_id, proc_id = proc_id)
+  #ver_dir = ver_dirs[1]
+  prods = repbox_prods()
+  for (ver_dir in ver_dirs) {
+    prod_file = file.path(ver_dir, "prod_df.Rds")
+    if (!file.exists(prod_file)) next
+    pid = fp_ver_dir_to_prod_id(ver_dir)
+    prod = prods[[pid]]
+    if (is.null(prod)) next
+    prod_df = readRDS(prod_file)
+    new_prod_df = prod_set_df_col_class(prod_df, prod)
+    if (!identical(prod_df, new_prod_df)) {
+      cat("\nCorrected classes for ", ver_dir)
+      saveRDS(new_prod_df, prod_file)
+    }
+  }
+}
+```
+# END OF FILE: rai_debug.R
+
+-----------------------------------------------------------
+
+
+# FILE: rai_media.R
+```
+# Generate typical media and context used in rebox analyses
+example = function() {
+  project_dir = "~/repbox/projects_share/aejapp_1_2_4"
+  outfile = rai_media_all_static_do(project_dir)
+  tab_main = rai_pick_tab_main(project_dir,"art")$tab_main
+  outfile = rai_media_all_tab_html(project_dir, tab_main)
+  rstudioapi::filesPaneNavigate(dirname(outfile))
+}
+
+rai_media_all_static_do = function(project_dir, script_df = rai_load_do_source(project_dir)) {
+  restore.point("rai_make_all_static_do")
+  if (!has_col(script_df,"script_file")) {
+    script_df = script_df_shorten_file(script_df)
+  }
+  
+  txt = paste0(
+    paste(rep("*", 60), collapse=""),"\n",
+    script_df$script_file,"\n",
+    paste(rep("*", 60), collapse=""),"\n\n",
+    "Below is the code of ", script_df$file_path, " with line numbers\n\n",
+    add_line_numbers_to_code(script_df$text),
+    "\n"
+  )
+  outfile = rai_save_prompt_media_file(txt, project_dir, base="static_do.txt")
+  outfile
+  
+}
+
+add_line_numbers_to_code = function(code, pad_len) {
+  if (length(code)>1) {
+    return(sapply(code, add_line_numbers_to_code))
+  }
+  code = sep.lines(code)
+  pad_len = max(2, ceiling(log(length(code)+1,10)))
+  paste0(
+    stri_pad_right(seq_along(code),pad_len),
+    ": ",
+    code,
+    collapse="\n"
+  )
+}
+
+rai_media_all_tab_html = function(project_dir, tab_main, doc_type="art", base=NULL) {
+  restore.point("rai_make_all_tab_html")
+  fp_dir = rai_fp_dir(project_dir, doc_type)
+  
+  tab_df = tab_main
+  title_col = "tabtitle"; notes_col = "tabnots"
+  tabtitles =   
+  html = paste0(paste0("<h2>",tab_df$tabtitle, "</h2>", tab_df$tabhtml, "<p>", na_val(tab_df$tabnotes,""),"</p>"))
+  
+  html = paste0(html, collapse="\n")
+  
+  if (is.null(base)) {
+    base = paste0(doc_type,"_tabs.html")
+  }
+  outfile = rai_save_prompt_media_file(html, project_dir, base)
+  outfile
+}
+
+rai_media_tab_html = function(project_dir, tabid, tab_main, all_ref_li=NULL, all_part_df = NULL, outfile=NULL, doc_type="art") {
+  restore.point("rai_make_tab_prompt_html")
+  fp_dir = rai_fp_dir(project_dir, doc_type)
+  
+  tab_main = tab_df = tab_main[tab_main$tabid == tabid,]
+  title_col = "tabtitle"; notes_col = "tabnots"
+  tabtitles =   
+    tab_html = paste0(paste0("<h2>",tab_df$tabtitle, "</h2>", tab_df$tabhtml, "<p>", na_val(tab_df$tabnotes,""),"</p>"))
+  
+  ref_txt = NULL
+  if (!is.null(all_ref_li)) {
+    ref_txt = sapply(seq_along(all_ref_li), function(i) {
+      paste0(repboxDoc::rdoc_tab_ref_text(tabid = tabid, ref_li = all_ref_li[[i]],part_df = all_part_df[[i]],sep_str = "<p>[...]</p>")$text, collapse="\n")
+    })
+    ref_txt = ref_txt[nchar(ref_txt)>0]
+    ref_txt = paste0(ref_txt, collapse = "<p>[...]</p>")
+  }
+  if (length(ref_txt)>0) {
+    ref_html = paste0("<p>", ref_txt, "</p>")
+    html = paste0(tab_html, "\n<h2>Parts in the text that reference to the table </h2>", ref_html)
+  } else {
+    html = tab_html
+  }
+  html = paste0(html, collapse="\n")
+  
+  if (!is.null(outfile)) {
+    outdir = dirname(outfile)
+    if (!dir.exists(outdir)) dir.create(outdir,recursive = TRUE)
+    writeUtf8(html, outfile)
+    
+  }
+  invisible(html)
+}
+
+
+rai_save_prompt_media_file = function(txt, project_dir, base, ind=NULL) {
+  restore.point("rai_save_prompt_media_file")
+  dir = file.path(project_dir,"fp","prompt_files")
+  if (!dir.exists(dir)) dir.create(dir)
+  if (is.null(ind)) {
+    outfile = paste0(dir, "/", base)
+  } else {
+    outfile = paste0(dir, "/", tools::file_path_sans_ext(base),"--", ind, tools::file_ext(base))
+  }
+  writeUtf8(txt, outfile)
+  outfile
+}
+```
+# END OF FILE: rai_media.R
+
+-----------------------------------------------------------
+
+
+# FILE: rai_pick.R
+```
+
+doc_file_form_default_pref = function() {
+  c("html","pdf","mocr_md", "pdf_txt")
+}
+
+tab_df_default_pref = function(prod_id = "tab_main") {
+  glob2rx(c("html","pdf-g*","mocr","pdf_txt"))
+}
+
+
+map_reg_static_default_pref = function() {
+  glob2rx(c("gp25*mocr*","gp25*"))
+}
+
+
+tab_ref_default_pref = function() {
+  c("html", "mocr","pdf")
+}
+
+
+rai_pick_tab_df = function(project_dir, prod_id = "tab_main", doc_type, pref =  tab_df_default_pref(prod_id), pru = NULL) {
+  if (is.null(pru)) pru = list()
+  
+  fp_dir = file.path(project_dir, "fp", paste0("prod_",doc_type))
+  pru$tab_df_info = fp_pick_prod_ver(fp_dir, prod_id, pref=pref)
+  pru$tab_df = fp_load_prod_df(pru$tab_df_info$ver_dir)
+  pru
+}
+```
+# END OF FILE: rai_pick.R
+
+-----------------------------------------------------------
+
+
+# FILE: rai_prompt.R
+```
+# Generate typical media and context used in rebox analyses
+example = function() {
+  library(repboxAI)
+  library(restorepoint)
+  project_dir = "~/repbox/projects_share/aejapp_1_2_4"
+  outfile = rai_media_all_static_do(project_dir)
+  outfile = rai_media_all_tab_html(project_dir)
+  rstudioapi::filesPaneNavigate(dirname(outfile))
+  
+  ver_dir = "~/repbox/projects_share/aeri_1_2_6/fp/prod_art/map_reg_static/g25pe-pdf-g2f/v0"
+  map_df = fp_load_prod_df(ver_dir)
+  
+}
+
+merge_unique_comma_str = function(str) {
+  paste0(unique(unlist(stri_split_fixed(str, ",") 
+  )), collapse=",")
+}
+
+rai_prompt_value_reg_list_static = function(map_df, values=list()) {
+  # Transform map_df to reg_df
+  map_df = rename.cols(map_df, "do_file","script_file")
+  reg_df = map_df %>%
+    group_by(tabid, regid) %>%
+    summarize(
+      cell_ids = merge_unique_comma_str(cell_ids),
+      script_files = merge_unique_comma_str(script_file),
+      code_lines = merge_unique_comma_str(code_line)
+    ) %>%
+    ungroup()
+  values$reg_list_static = text_table(reg_df)
+  values
+}
+
+
+rai_prompt_value_reg_run_list = function(reg_df, values=list()) {
+  values$reg_run_list = text_table(reg_df[c("runid")])
+  values
+}
+
+
+rai_prompt_value_tab_list = function(tab_df, values = list(), header = c("tabid", "tab_title")) {
+  values$tab_list = text_table(tab_df[c("tabid", "tabtitle")], header=header)
+  values
+}
+
+rai_prompt_value_script_list = function(script_df, values = list(), header = c("script_file")) {
+  restore.point("rai_prompt_value_script_list")
+  values$script_list = text_table(script_df[c("script_file")], header=header)
+  values
+}
+```
+# END OF FILE: rai_prompt.R
+
+-----------------------------------------------------------
+
+
+# FILE: rai_pru.R
+```
+# Create an rai_pru object that can be used for an ai-based analysis
+example = function() {
+  library(repboxAI)
+  rgemini::set_gemini_api_key(file = "~/repbox/gemini/gemini_api_key.txt")
+  set_ai_opts(model = "gemini-2.0-flash")
+  set_ai_opts(model = "gemini-2.5-pro-exp-03-25")
+  
+  project_dir = "~/repbox/projects_share/aeri_1_2_6"
+  pru = 
+    rai_pru_base(project_dir, "reg_classify_static", doc_type="art", overwrite=TRUE) %>%
+    rai_pru_add_doc() %>%
+    rai_pru_add_tab_df() %>%
+    rai_pru_add_reg_list_static() %>%
+    rai_pru_add_tab_media(in_context=FALSE)
+
+  proc_rai_pru(pru)
+  
+  rstudioapi::filesPaneNavigate(project_dir)
+}  
+
+
+rai_pru_base = function(project_dir, prod_id, doc_type="art", ai_opts = get_ai_opts(), verbose=TRUE, to_v0=TRUE, tpl_id = paste0(prod_id), json_mode=TRUE, use_schema = FALSE, overwrite=FALSE, tpl_dir = rai_tpl_dir(), tpl_file = NULL, proc_prefix = "", proc_postfix="", parcels=list()) {
+  fp_dir = file.path(project_dir, "fp", paste0("prod_",doc_type))
+  prefix = postfix = ""
+  pru = copy_into_list()
+  restore.point("rai_pru_base")
+  
+  pru$doc_types = repbox_doc_types(project_dir)
+  pru$media_files = NULL
+  pru$context_media_files = NULL
+  return(pru)
+}  
+
+rai_pru_add_doc = function(pru, add_all_doc=TRUE, doc_file_form_pref = doc_file_form_default_pref(), in_context=TRUE) {
+  if (is.null(pru)) return(pru)
+  pru = copy_into_list(dest=pru, exclude = "pru")
+  restore.point("rai_pru_add_doc")
+  
+  pru$doc_files = rai_doc_file(pru$project_dir,doc_type = NULL, doc_file_form_pref)
+  if (length(pru$doc_files)==0) {
+    cat("\nNo doc_files found.")
+    return(NULL)
+  }
+  
+  pru$doc_file = rai_doc_file(pru$project_dir, pru$doc_type, doc_file_form_pref)
+  
+  if (add_all_doc) {
+    media_files = pru$doc_files
+  } else {
+    media_files = pru$doc_file
+  }
+  rai_pru_add_media(pru, media_files, in_context)
+}
+
+# rai_pru_adapt_proc_id = function(pru, prefix="", postfix="", new_proc_id=NULL) {
+#   if (is.null(pru)) return(pru)
+#   restore.point("rai_pru_adapt_proc_id")
+#   if (is.null(new_proc_id)) {
+#     new_proc_id = paste0(prefix, pru$proc_id, postfix)
+#   }
+#   
+#   new_proc_dir = file.path(dirname(pru$proc_dir),new_proc_id)
+#   new_ver_dir = file.path(new_proc_dir, "v0")
+#   new_ver_id = fp_ver_dir_to_ids(new_ver_dir)$ver_id
+#   pru$proc_info$proc_id = new_proc_id
+#   pru$proc_id = new_proc_id
+#   pru$ver_dir = new_ver_dir
+#   pru$ver_id = new_ver_id
+#   pru
+# }
+
+rai_pru_add_tab_df = function(pru, tab_prod_id = "tab_main", tab_df_pref = tab_df_default_pref(tab_prod_id), by_tab = FALSE, tab_chunk_size = if (by_tab) 1 else NULL, tab_df_id = tab_prod_id) {
+  if (is.null(pru)) return(pru)
+  pru = copy_into_list(dest=pru, exclude = "pru")
+  restore.point("rai_pru_add_tab_df")
+  
+  pru$tab_df_info = fp_pick_prod_ver(pru$fp_dir, tab_prod_id, pref=tab_df_pref)
+  if (NROW(pru$tab_df_info)==0 | fp_is_err_obj(pru$tab_df_info)) {
+    cat(paste0("\nPlease first successfully create ", tab_prod_id,".\n"))
+    return(NULL)
+  }
+  
+  
+  pru$tab_df = fp_load_prod_df(pru$tab_df_info$ver_dir)
+  
+  postfix=paste0("-", pru$tab_df_info$proc_id)
+  if (isTRUE(tab_chunk_size < NROW(pru$tab_df)) & !by_tab) {
+    postfix = paste0(postfix, "_c",tab_chunk_size)     
+  }
+  pru$postfix = paste0(postfix, pru$postfix)
+  
+  if (!is.null(tab_chunk_size) & is.null(pru$itemize_by)) {
+    pru$itemize_by = "tab_df"
+    pru$item_chunk_size = tab_chunk_size
+  }
+  
+  pru
+}
+
+rai_pru_add_tab_media = function(pru, tab_df = pru$tab_df, by_tab = FALSE, add_ref = FALSE, in_context=FALSE, tab_ref_pref = tab_ref_default_pref()) {
+  if (is.null(pru)) return(pru)
+  restore.point("rai_pru_add_tab_media")
+  # most overwrite every time: not a unique name
+  base = paste0(pru$doc_type, "_tabs.html")
+  
+  if (add_ref & !by_tab) stop("Currently table references can only be added (add_ref=TRUE) if by_tab=TRUE")
+  
+  if (!by_tab) {
+    outfile = rai_media_all_tab_html(pru$project_dir,tab_df,doc_type=pru$doc_type, base)
+    pru = rai_pru_add_media(pru, outfile, in_context)
+  } else {
+    if (!isTRUE(pru$item_chunk_size==1)) {
+      stop("by_tab=TRUE only works if yo have set by_tab=TRUE in rai_pru_add_tab_df.")
+    }
+    pru$add_by_tab_media = TRUE
+    pru$tab_media_add_ref = add_ref
+    
+    if (add_ref) {
+      pru$ref_li_doc_dirs = sapply(pru$doc_types, function(dt) {
+        rai_pick_ref_li_doc_dir(project_dir,doc_type=dt,tab_ref_pref)
+      })
+      if (length(pru$ref_li_doc_dir)>0) {
+        pru$ref_li_form = rdoc_form(pru$ref_li_doc_dirs[[1]])
+        pru$all_ref_li = lapply(pru$ref_li_doc_dirs, rdoc_load_ref_li)
+        pru$all_part_df = lapply(pru$ref_li_doc_dirs,rdoc_load_part_df)
+      }
+      
+    }
+    
+    
+    
+  }
+  pru
+}
+
+rai_pru_add_reg_list_static = function(pru, map_reg_static_pref = map_reg_static_default_pref(), filter_tab_df = TRUE) {
+  if (is.null(pru)) return(pru)
+  pru = copy_into_list(dest=pru, exclude = "pru")
+  restore.point("rai_pru_add_reg_list_static")
+  
+  pru$map_ver_info = fp_pick_prod_ver(pru$fp_dir,"map_reg_static", pref = map_reg_static_pref)
+  
+  if (NROW(pru$map_ver_info)==0) {
+    cat("\nPlease first successfully create map_reg_static.\n")
+    return(NULL)
+  }
+  
+  pru$map_df = fp_load_prod_df(pru$map_ver_info$ver_dir)
+  if (filter_tab_df) {
+    if (is.null(pru$tab_df)) stop("Please make sure to first call rai_pru_add_tab_df.")
+    pru$tab_df = pru$tab_df[pru$tab_df$tabid %in% pru$map_df$tabid,]
+  }
+  pru$postfix = paste0("-", str.left.of(pru$map_ver_info$proc_id,"-"),pru$postfix)
+  pru
+}
+
+rai_pru_add_media = function(pru, media_files, in_context = TRUE) {
+  if (is.null(pru)) return(pru)
+  if (in_context) {
+    pru$context_media_files = unique(c(pru$context_media_file, media_files))
+  } else {
+    pru$media_files = unique(c(pru$media_file, media_files))
+  }
+  pru
+}
+
+rai_pru_load_parcels = function(pru, parcel_names, parcels=pru[["parcels"]]) {
+  if (is.null(parcels)) parcels = list()
+  pru$parcels = repdb_load_parcels(pru$project_dir, parcel_names, parcels)
+  pru
+}
+
+rai_pru_add_static_do = function(pru, in_context=FALSE) {
+  restore.point("rai_pru_add_static_do")
+  pru = rai_pru_load_parcels(pru, "stata_source")
+  pru$do_df = rai_load_do_source(project_dir,pru$parcels) 
+  outfile = rai_media_all_static_do(project_dir,script_df = pru$do_df)
+  pru = rai_pru_add_media(pru,outfile, in_context=in_context)
+  pru
+}
+
+rai_pru_add_reg_df = function(pru, parcels = pru$parcels) {
+  restore.point("rai_pru_add_reg_run_df")
+  pru = rai_pru_load_parcels(pru, "reg_core")
+  pru$reg_df = pru$parcels$reg_core$reg
+  pru
+}
+
+rai_pru_add_run_do = function(pru, in_context=FALSE, only_reg_df_output = FALSE) {
+  restore.point("rai_pru_add_run_do")
+  pru = rai_pru_load_parcels(pru, "stata_source")
+  pru$do_df = rai_load_do_source(project_dir,pru$parcels)
+  output_just_runid = NULL
+  if (only_reg_df_output) {
+    output_just_runid = pru$reg_df$runid
+  }
+  
+  outfile = rai_media_run_do(project_dir,parcels=pru$parcels, output_just_runid = output_just_runid)
+  pru = rai_pru_add_media(pru,outfile, in_context=in_context)
+  pru
+}
+
+
+
+rai_pru_set_tpl = function(pru, tpl_id=pru$tpl_id, tpl_dir=pru$tpl_dir, tpl_file = pru[["tpl_file"]], tpl=pru[["tpl"]]) {
+  if (is.null(pru)) return(pru)
+  pru = copy_into_list(dest=pru, exclude = "pru")
+  restore.point("rai_pru_set_tpl")
+  
+  if (is.null(tpl_file) & is.null(tpl)) {
+    tpl_file = file.path(tpl_dir, paste0(tpl_id,".txt"))
+  }
+  pru$tpl_file = tpl_file
+  if (is.null(tpl)) {
+    tpl = paste0(readLines(tpl_file), collapse="\n")
+  }
+  pru$tpl = tpl
+  pru$tpl_var = ai_tpl_vars(pru$tpl)
+  pru
+}
+
+proc_rai_pru = function(pru) {
+  restore.point("proc_rai_pru")
+  if (is.null(pru)) return(NULL)
+  
+  if (is.null(pru[["tpl"]]))
+    pru = rai_pru_set_tpl(pru)
+  
+  prefix = paste0(pru$proc_prefix, pru$prefix)
+  postfix = paste0(pru$postfix, pru$proc_postfix)
+  
+  pru$proc_info = rai_make_proc_info(prod_id=pru$prod_id,ai_opts = pru$ai_opts,tpl_file = pru$tpl_file, json_mode=pru$json_mode, use_schema = pru$use_schema, tpl_id=pru$tpl_id,proc_prefix = prefix, proc_postfix = postfix)
+  
+  pru$proc_id  = pru$proc_info$proc_id
+  pru = pru_init_dirs(pru=pru)
+  
+  # We check overwrite a bit late, but I don't know a better approach
+  # since ver_dir may depend on the different steps
+  # when building pru
+  if (!pru$overwrite) if (fp_ver_dir_ok(pru$ver_dir)) return(NULL)
+
+  
+  # Some values for prompt can be set in advance
+  values = list()
+  if ("doc_type_descr" %in% pru$tpl_var) {
+    if (length(pru$doc_types)<=1) {
+      values$doc_type_descr = "scientific article"
+    } else if (length(pru$doc_types)==2) {
+      values$doc_type_descr = "scientific article and an online appendix"
+    } else {
+      values$doc_type_descr = paste0("scientific article and ", length(pru$doc_types)-1," online appendices")
+    }
+  }
+  
+  if ("cur_doc" %in% pru$tpl_var) {
+    if (pru$doc_type=="art") {
+      values$cur_doc = "the article"
+    } else if (length(pru$doc_types)<=2) {
+      values$cur_doc = "the online appendix"
+    }  else {
+      values$cur_doc = "an online appendix"
+    }
+  }
+  if ("script_list" %in% pru$tpl_var) {
+    values = rai_prompt_value_script_list(pru$do_df, values)
+  }
+  pru$values = values
+  
+  pru_next_stage(pru, "proc_rai_pru_run")
+}
+
+proc_rai_pru_run = function(pru) {
+  restore.point("proc_rai_pru_run")
+  
+  if (isTRUE(pru$verbose)) {
+    cat("\nRun ", pru$ver_dir,"\n")
+  }
+  
+  project_dir = pru$project_dir
+  
+  if (length(pru$content_media_files)>0) {
+    pru$context = rai_context(pru$project_dir,model = pru$ai_opts$model,media_files = pru$context_media_files)
+  }
+  
+  values = pru$values
+  if ("script_list" %in% pru$tpl_var) {
+    values = rai_prompt_value_script_list(pru$do_df, values)
+  }
+  
+  if ("tab_list" %in% pru$tpl_var & !isTRUE(pru$itemize_by=="tab_df")) {
+    values = rai_prompt_value_tab_list(pru$tab_df, values)
+  }
+  if ("reg_run_list" %in% pru$tpl_var) {
+    values = rai_prompt_value_reg_run_list(pru[["reg_df"]], values)
+  }
+  if ("reg_list_static" %in% pru$tpl_var) {
+    values = rai_prompt_value_reg_list_static(pru$map_df, values)
+  }
+  
+  rai = rai_init(pru$project_dir,proc_info = pru$proc_info,media_files = pru[["media_files"]],context = pru[["context"]])
+  
+  
+  if (!is.null(pru$itemize_by)) {
+    org_media_files = pru$media_files
+    item_df = pru[[pru$itemize_by]]
+    inds = seq_len(NROW(item_df))
+    chunks  = split(inds, ceiling(seq_along(inds) / pru$item_chunk_size))
+    num_items = length(chunks)
+    
+    row = 1
+    pru = pru_make_items(pru, num_items = num_items, function(row, pru,...) {
+      restore.point("proc_rai_pru_run_item_fun")
+      tab_df = pru$tab_df[chunks[[row]],]
+      media_files = org_media_files
+
+      if ("tabtitle" %in% pru$tpl_var & isTRUE(pru$itemize_by=="tab_df")) {
+        values$tabtitle = tab_df$tabtitle
+      }
+      
+            
+      if ("tab_list" %in% pru$tpl_var & isTRUE(pru$itemize_by=="tab_df")) {
+        values = rai_prompt_value_tab_list(tab_df, values)
+      }
+      
+      if (pru$add_by_tab_media) {
+        tabid = tab_df$tabid
+        outfile = file.path(pru$project_dir,"fp","prompt_files",paste0("tab--",tabid,".html"))
+        html = rai_media_tab_html(pru$project_dir,tabid = tabid, tab_main = tab_df, all_ref_li=pru[["all_ref_li"]], all_part_df = pru[["all_part_df"]], outfile=outfile)
+        if (file.exists(outfile)) {
+          media_files = c(media_files, outfile)
+        }
+        rai$media_files = media_files
+      }
+      
+      res = ai_run(rai, values=values)
+    })
+  } else {
+    res = ai_run(rai, values=values)
+    pru$items = list(res)
+  }
+  pru = pru_set_status(pru, pru$items)
+  
+  restore.point("proc_rai_run_post")
+  temp_pru_save(pru); #pru = temp_pru
+  if (!pru_is_ok(pru)) return(invisible(pru))
+  prod = repbox_prod(pru$prod_id)
+  # Check: obj or arr? -> Need obj
+  schema = prod_to_schema(prod, "obj")
+  
+  res_df = ai_combine_content_df(pru$items,schema=schema)
+  prod_df = df_to_prod_df(res_df, repbox_prod(pru$prod_id))
+  pru_save(pru, prod_df)
+  writeLines(pru$items[[1]]$prompt, file.path(pru$ver_dir,"prompt.txt"))
+  return(invisible(pru))
+}
+```
+# END OF FILE: rai_pru.R
+
+-----------------------------------------------------------
+
+
+# FILE: rai.R
+```
+rai_tpl_dir = function() {
+  system.file("prompts", package="repboxAI")
+  "~/repbox/gemini/repboxAI/inst/prompts"
+}
+
+
+rai_model_short = function(model) {
+  ai_model_short(model)
+}
+
+rai_init = function(project_dir,json_mode=first_nn(proc_info$json_mode,FALSE), schema=NULL, values = NULL, context=NULL, media_files=NULL, tpl=NULL, tpl_file = proc_info$tpl_file,   model=ai_opts$model, temperature=ai_opts$temperature, proc_info=NULL, ai_opts=get_ai_opts() ) {
+  
+  ai_init(project_dir, json_mode=json_mode, schema=schema, values=values, context=context, media_files=media_files, tpl=tpl, tpl_file=tpl_file, model=model, temperature=temperature, ai_opts=ai_opts)
+}
+
+# Simple wrapper to ai_context
+#
+# Allow to easily add typical repbox files like art_pdf
+rai_context = function(project_dir, model=ai_opts$model, media_files = NULL, prompt=NULL, ttl_sec=60*5, doc_type_pdf = NULL, add_all_pdf = FALSE, cache_context = isTRUE(ai_opts$cache_context), api_key = getOption("gemini_api_key"), ai_opts = get_ai_opts()) {
+  restore.point("rai_context")
+  pdf_files = NULL
+  if (add_all_pdf) {
+    pdf_files = repbox_all_pdf_file(project_dir)
+  } else if (!is.null(doc_type_pdf)) {
+    pdf_files = repbox_pdf_file(project_dir, doc_type = doc_type_pdf)
+  }
+  media_files = sort(union(pdf_files, media_files))
+  ai_context(project_dir,model = model, media_files=media_files, prompt=prompt, ttl_sec=ttl_sec, cache_context = cache_context, api_key=api_key, ai_opts=ai_opts)
+}
+
+rai_run = function(rai,values=rai$values, verbose=FALSE) {
+  restore.point("rai_run")
+  rai = ai_run(rai, values, verbose)
+  rai
+}
+
+rai_doc_dir_to_project_dir = function(doc_dir) {
+  dirname(dirname(dirname(dirname(doc_dir))))
+}
+
+rai_fp_dir_to_project_dir = function(fp_dir) {
+  dirname(dirname(fp_dir))
+}
+
+rai_fp_dir_to_doc_type = function(fp_dir) {
+  str.right.of(basename(fp_dir),"prod_")
+}
+
+
+rai_has_input = function(doc_dir, ...) {
+  inputs = list(...)
+  restore.point("rai_has_input")
+  fp_dir = doc_dir_to_fp_dir(doc_dir)
+  doc_form = rdoc_form(doc_dir)
+  for (inp in inputs) {
+    if (isTRUE(inp=="pdf")) {
+      if (doc_form != "pdf") return(FALSE)
+    } else if (is.character(inp)) {
+      inp = list(prod_id = inp)
+    }
+    if (is.list(inp)) {
+      ok = fp_has_prod(fp_dir, inp$prod_id, inp$proc_id)
+      if (!ok) {
+        cat("\nRequired input ", inp$prod_id, " not found for ", doc_dir,"\n")
+        return(FALSE)
+      }
+    }
+  }
+  return(TRUE)
+}
+```
+# END OF FILE: rai.R
+
+-----------------------------------------------------------
+
+
+# FILE: repair.R
+```
+# Functions to repir stuff, e.g.
+# remove products that are renamed etc
+
+example = function() {
+  parent_dir = "~/repbox/projects_share"
+  project_dirs = repboxExplore::get_project_dirs(parent_dir)
+  prod_id = "readme_data_descr"
+  #prod_id = "tab_tino"
+  proc_id = NULL
+}
+
+# previously some cellid had form cell-2_4
+# others just 2_4
+# now common format c2_4
+repair_cell_id = function() {
+  parent_dir = "~/repbox/projects_share"
+  project_dirs = repboxExplore::get_project_dirs(parent_dir)
+
+  ver_dirs = fp_all_ver_dirs(project_dirs, "tab_html")
+  ver_dirs = fp_all_ver_dirs(project_dirs, "tab_main")
+  
+  ver_dir = ver_dirs[33]
+  for (ver_dir in ver_dirs) {
+    prod_df = fp_load_prod_df(ver_dir)
+    html = prod_df$tabhtml
+    html = html %>% stri_replace_all_fixed('id = "cell-cell-', 'id="')
+    html = html %>% stri_replace_all_regex('id[ ]*=[ ]*"', 'id="')
+    html = html %>% stri_replace_all_fixed('id="cell-', 'id="')
+
+    html = sapply(seq_along(html), function(i) {
+      str = html[i]
+      tabid = prod_df$tabid[i]
+      str = stri_replace_all_regex(str, 'id="(\\d+)"', paste0('id="c', tabid, '_$1"'))[[1]]
+      str = stri_replace_all_regex(str, 'id="(\\d+)-(\\d+)"','id="c$1_$2"')[[1]]
+      str = stri_replace_all_regex(str, 'id="(\\d+)_(\\d+)"','id="c$1_$2"')[[1]]
+      str
+    })
+    prod_df$tabhtml = html
+    fp_save_prod_df(prod_df, ver_dir)
+  }
+
+  ver_dirs = fp_all_ver_dirs(project_dirs, "cell_base")
+  ver_dirs = fp_all_ver_dirs(project_dirs, "cell_list")
+  ver_dir = ver_dirs[1]
+  
+  for (ver_dir in ver_dirs) {
+    prod_df = fp_load_prod_df(ver_dir)
+    cellid = prod_df$cellid
+    cellid = stri_replace_first_fixed(cellid, "cell-","")
+    cellid = stri_replace_all_fixed(cellid,  '-',"_")
+    
+    rows = stri_detect_regex(cellid,"^\\d+_\\d+$" )
+    cellid[rows] = paste0("c", cellid[rows])
+    rows = stri_detect_regex(cellid,"^\\d+$" )
+    cellid[rows] = paste0("c", prod_df$tabid[rows], "_", cellid[rows])
+    prod_df$cellid = cellid
+    fp_save_prod_df(prod_df, ver_dir, overwrite=TRUE)
+  }
+
+  
+  ver_dirs = fp_all_ver_dirs(project_dirs, "map_reg_static")
+  ver_dir = ver_dirs[1]
+  
+  for (ver_dir in ver_dirs) {
+    prod_df = fp_load_prod_df(ver_dir)
+    cellids = prod_df$cell_ids
+    i = 1
+    cellids = sapply(seq_along(cellids), function(i) {
+      str = cellids[i]
+      tabid = prod_df$tabid[i]
+      str = stri_replace_all_fixed(str, "cell-","")
+      str = stri_replace_all_regex(str,  '(?<=^|,)(\\d+)(?=,|$)', paste0(tabid,"_$1"))
+      str = stri_replace_all_fixed(str,  '-',"_")
+      str = stri_replace_all_regex(str,  '(?<=^|,)(\\d+_\\d+)(?=,|$)', paste0("c$1"))
+      str
+    })
+    prod_df$cell_ids = cellids
+    prod_df = rename.col(prod_df, "do_file", "script_file")
+    fp_save_prod_df(prod_df, ver_dir, overwrite=TRUE)
+  }
+  
+
+  ver_dirs = fp_all_ver_dirs(project_dirs, "reg_classify_static")
+  ver_dir = ver_dirs[1]
+  
+  for (ver_dir in ver_dirs) {
+    prod_df = fp_load_prod_df(ver_dir)
+    cellids = prod_df$cell_id_coef_of_interest
+    i = 1
+    cellids = sapply(seq_along(cellids), function(i) {
+      str = cellids[i]
+      tabid = prod_df$tabid[i]
+      str = stri_replace_all_fixed(str, "cell-","")
+      str = stri_replace_all_regex(str,  '(?<=^|,)(\\d+)(?=,|$)', paste0(tabid,"_$1"))
+      str = stri_replace_all_fixed(str,  '-',"_")
+      str = stri_replace_all_regex(str,  '(?<=^|,)(\\d+_\\d+)(?=,|$)', paste0("c$1"))
+      str
+    })
+    prod_df$cell_id_coef_of_interest = cellids
+    fp_save_prod_df(prod_df, ver_dir, overwrite=TRUE)
+  }
+  
+}
+
+rename_map_reg_static_proc_id = function() {
+  library(repboxAI)
+  parent_dir = "~/repbox/projects_share"
+  project_dirs = repboxExplore::get_project_dirs(parent_dir)
+  proc_dirs = list.files(paste0(project_dirs,"/fp"), glob2rx("g25pe"),recursive = TRUE,include.dirs = TRUE, full.names = TRUE) 
+  proc_dirs = proc_dirs[has.substr(proc_dirs, "/map_reg_static/") ]
+  proc_dirs = proc_dirs[dir.exists(proc_dirs)]
+  
+  for (proc_dir in proc_dirs) {
+    ver_dir = file.path(proc_dir, "v0")
+    pru_files = file.path(ver_dir, c("pru.Rds", "outage_pru.Rds", "error_pru.Rds"))
+    pru_files = pru_files[file.exists(pru_files)]
+    
+    
+    proc_id = basename(proc_dir)
+    new_procid = NULL
+    for (pru_file in pru_files) {
+      pru = readRDS(pru_files)
+      if (pru$proc_id != "g25pe") next
+      tabmain_procid = pru$tab_main_info$proc_id
+      new_procid = paste0(pru$proc_id, "-", tabmain_procid)
+      new_proc_dir = file.path(dirname(proc_dir),new_procid)
+      new_ver_dir = file.path(new_proc_dir, "v0")
+      new_ver_id = fp_ver_dir_to_ids(new_ver_dir)$ver_id
+      pru$proc_info$proc_id = new_procid
+      pru$proc_id = new_procid
+      pru$ver_dir = new_ver_dir
+      pru$ver_id = new_ver_id
+      saveRDS(pru, pru_file)
+    }
+    if (!is.null(new_procid)) {
+      file.rename(proc_dir, new_proc_dir)
+    }
+  }
+}
+
+fp_prod_dir_to_trash = function(parent_dir, prod_id) {
+  rem_ver_dirs = unique(c(
+    fp_all_ver_dirs(parent_dir, prod_id),
+    fp_all_error_ver_dirs(parent_dir,prod_id),
+    fp_all_outage_ver_dirs(parent_dir, prod_id)
+  ))
+  if (NROW(rem_ver_dirs)==0) {
+    cat("\nNo prod_dir found for ", prod_id,"\n")
+    return(NULL)
+  }
+  rem_prod_dirs = unique(fp_ver_dir_to_prod_dir(rem_ver_dirs))  
+}
+
+remove_old_rai_dirs = function(project_dirs) {
+  rai_dirs = file.path(project_dirs,"rai")
+  rai_dirs = rai_dirs[dir.exists(rai_dirs)]
+  dir_to_trash(rai_dirs)
+}
+```
+# END OF FILE: repair.R
+
+-----------------------------------------------------------
+
+
+# FILE: repbox_prods.R
+```
+example = function() {
+  prods = repbox_prods()
+  names(prods)
+  prod = repbox_prod("reg_classify_static")
+  prod = repbox_prod("map_reg_run")
+  prod = repbox_prod("map_inv_reg_run")
+  
+  prod = repbox_prod("readme_overview")
+  prod = repbox_prod("readme_vs_guide")
+  prod_to_json_schema(prod, "obj",allow_null_def = TRUE)
+  prod = repbox_prod("readme_data")
+  prod_to_json_schema(prod, "arr",allow_null_def = FALSE)
+  
+  
+  # write all json schemas so they 
+  # can be used in AI prompts
+  prods = repbox_prods()
+  i = 1
+  for (i in seq_along(prods)) {
+    prod_name = names(prods[i])
+    file = paste0("~/repbox/gemini/repboxAI/inst/prod_schemas/", prod_name, ".json")
+    json = prod_to_json_schema(prods[[i]], "obj",, allow_null_def = FALSE)
+    writeLines(json, file)  
+  }
+}
+
+repbox_prod = function(pid, prods = repbox_prods()) {
+  prods[[pid]]
+}
+
+repbox_prods = function() {
+  c(
+    repbox_tab_prods(),
+    repbox_readme_prods(),
+    repbox_map_prods(),
+    repbox_other_prods()
+  )
+}
+
+
+repbox_tab_prods = function() {
+  prods_define(
+    prod_define("tab_list",
+      descr = "List of article's tables",
+      list(
+        tabid = schema_str(is_key=TRUE,maxLength = 10),
+        otabid = schema_str(), # ordered tabid by augmenting numbers with 0s from left
+        tabtitle = schema_str(maxLength=400)
+      ),
+      keys = "tabid",
+      order_by = "otabid"
+    ),
+    prod_define("tab_notes",
+      descr = "List of article's tables with extracted title and table notes",
+      widens = "tab_list",
+      list(
+        tabnotes = schema_str(maxLength=2000)
+      )
+    ),
+    prod_define("tab_html",
+      descr = "Contains normalized HTML of every extracted article table",
+      widens = "tab_list",
+      list(
+        tabhtml = schema_html_tab()
+      )
+    ),
+    prod_define("tab_main",
+      descr = "Article tables with html, title and notes",
+      widens = c("tab_html","tab_notes")          
+    ),
+    prod_define("tab_classify",
+      list(
+        tabid = schema_str("The table id"),
+        tab_title = schema_str("The table title"),
+        panels = schema_str("Some tables exist of different panels shown above each other. If that is the case return a comma separated string with short panel IDs e.g. 'A,B,C' if it has a panel A, panel B and panel C. If no separate panels are marked just return null."),
+        num_panels = schema_int("The number of explicit panels in the table. If the table does not distinguish panels, write 0."),
+        shows_descriptive = schema_bool("true if the table shows descriptive statistics"),
+        is_balancing_table = schema_bool("true if the table is a balancing table that shows whether certain characteristics are similarily distributed between control and treatment groups."),
+        shows_regression = schema_bool("true if results of one or several regressions are shown in the table."),
+        shows_did = schema_bool("true if results of a difference-in-difference regression are shown in the table."),
+        shows_rdd = schema_bool("true if results of regression discontinuity design are shown in the table."),
+        shows_iv_results =  schema_bool("true if results of an instrumental variable regression are shown in the table"),
+        shows_iv_first_stage = schema_bool("true if results of a first stage instrumental variable regression are shown in the table."),
+        shows_placebo_test = schema_bool("true if results of a placebo test are shown in the table"),
+        num_regression = schema_int("The results of how many separate regressions are shown in the table?"),
+        uses_panel_data =  schema_bool("true if the data set underlying the table is a panel data set."),
+        short_descr =  schema_str("A short description of what is shown in the table.", allow_null = FALSE)
+      )
+    ),
+    prod_define(
+      "cell_list",
+      # means 1 parent row can have multiple children rows
+      parent = "tab_html",
+      from_parent = c("tabid","otabid"),
+      fields = list(
+        cellid = schema_str(),
+        row = schema_int(),
+        col = schema_int(),
+        inner_html = schema_str(),
+        text = schema_str(),
+        colspan = schema_int(),
+        rowspan = schema_int()
+      ),
+      keys = c("cellid"),
+      order_by = c("otabid","cellid"),
+      test_group_by = c("tabid")
+    ),
+    prod_define(
+      "cell_base",
+      widens = "cell_list",
+      fields = list(
+        has_num = schema_bool(),
+        num_str = schema_str(),
+        num = schema_num(),
+        has_deci = schema_bool(descr = "Did the original string has a decimal point?"),
+        num_deci = schema_int(descr = "Number of digits after decimal point in original string"),
+        bracket = schema_str(enum=c("", "()","[]","{}")),
+        has_sig_star = schema_bool(),
+        sig_star_str = schema_str(),
+        other_num_str = schema_str(descr = "Not empty if we found another number string looking from the right"),
+        nchar = schema_int(),
+        nchar_letters = schema_int(),
+        
+        # Tests that can be quickly computed and will be added       
+        flag_two_num = schema_bool(descr="Are there two numbers in the cell? Can suggests incorrect cell splits."),
+        flag_two_deci = schema_bool(descr="Are there two decimal numbers in the cell? More strongly suggests wrong cell split."),
+        flag_miss_bracket_below = schema_bool(descr="Do we miss a cell like (3.42) below, because such cells are below other numbers in the row?"),
+        flag_miss_num_above_bracket = schema_bool(descr="Complements flag_miss_bracket_below, do we miss a cell with a normal number like 1.32 above a cell like (3.42)?")
+      ),
+      descr ="Will be generated with heuristics from cell_list. We have so many fields because they may facilitate consistency checks of the extracted tables."
+    )
+  )
+}
+
+
+repbox_readme_prods = function() {
+  prods_define(
+    prod_define(
+      "readme_overview",
+      fields = list(
+        readme_file = schema_str("The name of the readme file."),
+        is_reproduction_package_readme = schema_bool("Does the file roughly look like a typical readme file for a reproduction package? I.e. does it describe the code file and possibly the data files?"),
+        describes_data = schema_bool("Does the README file describes the data used in the analysis?"),
+        listed_data_set_files = schema_str("Comma separated string with names of data set files described in the README. "),
+        describes_variables = schema_bool("Does the README describe at least some variables contained in the data set?"),
+        missing_data = schema_bool("Does the README state that some data sets are missing in the reproduction package, e.g. because the data is confidential or proprietary?"),
+        missing_confidential_data = schema_bool("Does the README explicitly state that some data sets are missing due to confidentiality reasons?"),
+        missing_proprietary_data = schema_bool("Does the README explicitly state that some data sets are missing because they are propietary?"),
+        data_country = schema_str("Is there information that the data sets are from a particular country? If yes, state the countries as comma separated string. If the data is from a larger region state it, e.g. EU or world."),
+        data_year_start = schema_int("If the README provides information on the first year the data is from, state it. Otherwise return NA"),
+        data_year_end = schema_int("If the README provides information on the last year the data is from, state it. Otherwise return NA"),
+        missing_data_set_files = schema_str("Comma separated string with names of those data set files described flagged in the README as not included in the reproduction package, e.g. because they are proprietary or confidental."),
+        included_data_set_files = schema_str("Comma separated string with names of those data set files described as being included in the reproduction package."),
+        generated_data_set_files = schema_str("Comma separated string with names of those data set files described as being generated by the code in the reproduction package. Precomputed versions of the generated data sets may sometimes be already included in the reproduction package."),
+        analyst_notes = schema_str("Any other relevant information, context, or ambiguities noted in the README related to the fields above. Be brief. Analyst notes can often remain empty.")
+      ),
+      keys = c("readme_file")
+    ),
+    prod_define(
+      "readme_var",
+      fields = list(
+        readme_file = schema_str("The name of the readme file."),
+        varname = schema_str("Name of the variable"),
+        vardescr = schema_str("Description or label of the variable as given in the readme file."),
+        dataset_files = schema_str("If the readme file mentions in which data set file(s) the variable occurs, list those data set file names as a comma separated string.")
+      ),
+      keys = c("readme_file")
+    ),
+    prod_define(
+      "readme_script_tab_fig",
+      fields = list(
+        readme_file = schema_str("The name of the readme file."),
+        script_file = schema_str("Filename of the script"),
+        table_names = schema_str("Name of the table or tables that according to the README file are wholly or partially created by the script given in script_file. If the script creates multiple tables, write a comma separated list, e.g. 'Table 1, Table 3, Table A2.'"),
+        figure_names = schema_str("Name of the figure or figures that according to the README file are wholly or partially created by the script. If the script creates multiple figures, write a comma separated list, e.g. 'Figure 2, Figure 5'")
+      ),
+      keys = c("readme_file")
+    ),
+    prod_define(
+      "readme_data",
+      fields = list(
+        readme_file = schema_str("The name of the readme file."),
+        dataset_file = schema_str("Name of the data set. If a concrete file name is mentioned use that file name with extension. Sometimes the rows of a larger data set are distrbuted over several files with similar naming convetions. E.g. files like pop_de.csv, pop_fr.csv, pop_uk.csv, ... which all contain population data for a different country. In that case list up to three data set files from the larger data set as a comma separated list and add the glob pattern that matches all files in the next field dataset_file_glob."),
+        dataset_file_glob = schema_str("Only relevant if the data set rows are distributed over several files with similar naming convention. Then write down the glob pattern that matches all files. E.g. if the data set is in a set of files like pop_de.csv, pop_fr.csv, pop_uk.csv, ... which all contain population data for a different country. Write pop_*.csv. If not relevant, write just an empty string."),
+        dataset_descr = schema_str("Based on the information in the README a short description of the data set in 1 to 4 sentences."),
+        dataset_source = schema_str("If the README provides any information on the data set source, please state the source here."),
+        is_included = schema_bool("TRUE if the README says that the data set is included in the reproduction package. FALSE if the README states that the data set is not included, e.g. because it is proprietary. If not info is given, set to null.",allow_null = TRUE),
+        instructions_how_to_obtain_data = schema_bool("Only relevant for data sets that are not included. Does the README contain instructions of how to obtain the data set?"),
+        is_intermediate_data = schema_bool("Does the README state that it is an intermediate data set, generated from other raw data sets?"),
+        table_names = schema_str("If the README describes that the data set is used to generate certain tables in the article, please list all thoise tables as a comma separated list, e.g. 'Table 2, Table 3, Table A1.' If nothing is explicitly stated just write an empty string. "),
+        figure_names = schema_str("If the README describes that the data set is used to generate certain figures in the article, please list all thoise tables as a comma separated list, e.g. 'Figure 1, Figure 5'. If nothing is explicitly stated just write an empty string."),
+        data_country = schema_str("Is there information that the data is from one or multiple countries? If yes, state the countries as comma separated string. If the data is from a larger region state it, e.g. EU or world."),
+        explicitly_stated_data_country = schema_bool("TRUE if the information about 'data_country' explicitly stated in the README file, FALSE if you guessed the information."),
+        data_year_start = schema_int("If the README provides information on the first year of observatons in the data is from, state it."),
+        data_year_end = schema_int("If the README provides information on the last year of observations in the data, state it."),
+        explicitly_stated_data_year_start = schema_bool("TRUE if the information about 'data_year_start' explicitly stated in the README file, FALSE if you guessed the information."),
+        explicitly_stated_data_year_end = schema_bool("TRUE if the information about 'data_year_end' explicitly stated in the README file, FALSE if you guessed the information."), 
+        dataset_type = schema_str("Can one infer from the readme whether it is a 'panel', 'cross-section' or 'time series' data set? A 'panel' data set has a time dimensions and at least one cross sectional dimension. Example 1: A panel data set that has observations for multiple industries (cross-section dimension 1) in multiple countries (cross-section dimension 2) for multiple years (time dimension). Example 2: A panel data set with observations for multiple subjects (cross-section dimension 1) for multiple experimental rounds (time dimension). A cross-section data set has no explicit time dimension i.e. no multiple periods of observations for one cross section unit. A time-series data set only has a time dimension and just a single cross-section unit (e.g. a time series for a single country).",enum = c("panel", "cross-section","time series")),
+        explicitly_stated_data_set_type = schema_bool("TRUE if the information in the README really explicitly allows to infer the data set type, FALSE if you rather guessed the information."),
+        num_cross_section_dimensions = schema_int("For panel and cross-section data, can you infer the number of cross section dimensions of the data set from the README?"),
+        names_cross_section_dimensions = schema_str("For cross section or panel data sets can you infer suitable names for the cross section dimensions from the README? If there are multiple cross-section dimensions return a comma separated list."),
+        explicitly_stated_names_cross_section_dimensions = schema_bool("TRUE if the information in the README really explicitly allows to infer the cross section dimensions, FALSE if you rather guessed the dimesions."),
+        id_cross_section_dimensions = schema_str("For cross section or panel data sets can you infer from the README which variables are the ID variables contained in the data set for each cross section dimensions (e.g. subject id, sector id, country name, etc)? If there are multiple cross-section dimensions return a comma separated list."),
+        explicitly_stated_id_cross_section_dimensions = schema_bool("TRUE if the information in the README really explicitly allows to infer the cross section dimensions, FALSE if you rather guessed the dimenisons."),
+        name_time_dimension = schema_str("For time series or panel data sets can you infer from the README a suitable description of the time dimenions / frequency (e.g. 'year', 'year-month', 'day', 'experimental round') and write it down?"),
+        explicitly_stated_name_time_dimension = schema_bool("TRUE if the information in the README really explicitly allows to infer the type of time dimension of the data set, FALSE if you rather guessed the dimension."),
+        id_time_dimension = schema_str("For time series or panel data sets can you infer from the README which variables are ID variables for the time dimension (e.g. year, month, t, period) and write it down?"),
+        analyst_notes = schema_str("Any other relevant information, context, or ambiguities noted in the README file regarding this dataset. Be brief. Analyst notes can often remain empty.")
+      ),
+      keys = c("readme_file")
+    ),
+    prod_define(
+      "readme_data_descr",
+      fields = list(
+        readme_file = schema_str("The name of the readme file."),
+        dataset_file = schema_str("Name of the data set."),
+        dataset_descr = schema_str("Based on the information in the README a short description of the data set in 1 to 4 sentences."),
+        dataset_source = schema_str("If the README provides any information on the data set source, please state the source here.")
+      ),
+      keys = c("readme_file")
+    ),
+    prod_define(
+      "readme_vs_guide",
+      fields = list(
+        readme_file = schema_str("The name of the readme file being analyzed."),
+        overview_is_present = schema_bool("TRUE if an overview section is present at the beginning of the README."),
+        overview_mentions_runtime = schema_bool("TRUE if the overview gives an estimate of the total runtime for the replication."),
+        data_provenance_is_present = schema_bool("TRUE if a section discussing data availability and provenance is present."),
+        data_provenance_no_external_data_is_stated = schema_bool("TRUE if the README explicitly states that no external data is used."),
+        data_provenance_rights_statement_is_present = schema_bool("TRUE if any statement about rights to use or redistribute data is included."),
+        data_provenance_rights_claims_permission_to_use = schema_bool("TRUE if the author certifies legitimate access and permission to use the data."),
+        data_provenance_rights_claims_permission_to_redistribute = schema_bool("TRUE if the author certifies permission to redistribute the data in the package."),
+        data_provenance_license_is_present = schema_bool("TRUE if a subsection on data licensing is present."),
+        data_provenance_license_summary = schema_str("A brief summary of the data license mentioned (e.g., 'CC-BY-NC', 'Public Domain')."),
+        data_provenance_availability_summary = schema_str("The stated summary of data availability."),
+        data_provenance_sources_details_is_present = schema_bool("TRUE if detailed descriptions for individual data sources are provided."),
+        data_provenance_sources_details_uses_table_format = schema_bool("TRUE if the recommended tabular format (Data.Name, Location, Provided, Citation) is used to list data sources."),
+        dataset_list_is_present = schema_bool("TRUE if a section describing each data file in the package is present."),
+        dataset_list_uses_table_format = schema_bool("TRUE if a tabular format (Data file, Source, Notes, Provided) is used to list the files."),
+        computational_reqs_is_present = schema_bool("TRUE if a section on computational requirements is present."),
+        computational_reqs_software_is_present = schema_bool("TRUE if software requirements are listed."),
+        computational_reqs_software_mentions_setup_script = schema_bool("TRUE if the README mentions a program/script to install dependencies (e.g., '0_setup.do', 'requirements.txt')."),
+        computational_reqs_software_listed = schema_str("A comma-separated list of major software mentioned (e.g., 'Stata, Python, R, Matlab')."),
+        computational_reqs_randomness_is_present = schema_bool("TRUE if the README mentions controlled randomness or pseudo-random number generator seeds."),
+        computational_reqs_randomness_seed_is_set = schema_bool("TRUE if the README states that a random seed is set and ideally where."),
+        computational_reqs_performance_is_present = schema_bool("TRUE if performance requirements (runtime, storage, hardware) are described."),
+        computational_reqs_performance_estimated_runtime = schema_str("The approximate time stated to run the analysis (e.g., '1-2 hours', '> 14 days')."),
+        computational_reqs_performance_estimated_storage = schema_str("The approximate storage space needed (e.g., '250 MB - 2 GB')."),
+        computational_reqs_performance_mentions_hardware = schema_bool("TRUE if specific hardware (e.g., CPU cores, RAM, OS) used for the analysis is described."),
+        code_description_is_present = schema_bool("TRUE if a high-level overview of the program files and their purpose is given."),
+        code_description_license_is_present = schema_bool("TRUE if a subsection on code licensing is present."),
+        code_description_license_summary = schema_str("A brief summary of the code license mentioned (e.g., 'MIT', 'GPL')."),
+        replication_instructions_is_present = schema_bool("TRUE if a section with step-by-step instructions for the replicator is present."),
+        replication_instructions_is_linear_sequence = schema_bool("TRUE if the instructions are presented as a simple, clear, step-by-step list as recommended by the template."),
+        output_mapping_is_present = schema_bool("TRUE if a list or table mapping outputs (tables, figures) to the programs that generate them is present."),
+        output_mapping_reproducibility_claim = schema_str("The claim made about which outputs can be reproduced."),
+        output_mapping_uses_table_format = schema_bool("TRUE if the recommended tabular format (Figure/Table #, Program, Output file) is used for the mapping."),
+        references_section_is_present = schema_bool("TRUE if a 'References' section is present at the end of the README."),
+        analyst_summary = schema_str("A brief, one-to-three sentence summary of how well the README conforms to the template, noting any major omissions.")
+      ),
+      keys = c("readme_file")
+    )
+  )  
+}
+
+
+repbox_map_prods = function() {
+  prods_define(
+    prod_define("map_reg_static",
+      list(
+        tabid = schema_str("The table ID as stated in the list of tables above."),
+        regid = schema_str("A unique id you assign to each regression that you have identified. The format shall be `r{{tabid}}_{{counter}}`. E.g. the regid of 4th regression identified in Table 2 would be r2_4"),
+        script_file = schema_str("The name of the script file, as listed in the list of script files above. I.e. include file paths if they are stated in the list above."),
+        code_line = schema_int("The code line of the regression command in the script file, corresponding to the particular regression shown in the table. If the command extends over more than one line, write down the first line. If certain cells"),
+        cell_ids = schema_str("A comma separated list of all cell ids of those cells in the HTML version of the table that correspond to this specific regression and whose value was computed by the specified code line. E.g. for a table with tabid='2', this comma separated string of cell ids might look like 'c2_10,c2-12,c2-14'. Each cell id can be found as the 'id' tag of the corresponding <td> or <th> element of the HTML version of the article's table. Only add cells that show numeric results, e.g. estimated coefficient, or number of observations, but no title cells or cells showing variable labels. Some tables in articles are structured such that some descriptive statistics, like the number of observations are shown on the bottom of a column and apply to multiple regressions shown in that column. Add the corresponding cell id for every regression, that they apply to.")
+      )
+    ),
+    prod_define("map_reg_run", list(
+      tabid = schema_str("The table ID as stated in the list of tables above."),
+      regid = schema_str("A unique id you assign to each regression that you have identified. The format shall be `r{{tabid}}_{{counter}}`. E.g. the regid of 4th regression identified in Table 2 would be r2_4"),
+      cell_ids = schema_str("A comma separated list of all cell ids of those cells in the HTML version of the table that correspond to this specific regression and whose value was computed by the specified code line and correspond to the specified output. E.g. for a table with tabid='2', this comma separated string of cell ids might look like 'c2_10,c2_12,c2_14'. Each cell id can be found as the 'id' tag of the corresponding <td> or <th> element of the HTML version of the article's table. Only add cells that show numeric results, e.g. estimated coefficient, or number of observations, but no title cells or cells showing variable labels. Don't add here cells that belong to the regression but are computed in another (post-)regression command. For those cells a separate entry shall be generated. Some tables in articles are structured such that some descriptive statistics, like the number of observations are shown on the bottom of a column and apply to multiple regressions shown in that column. Add the cell ids of such statistics to every regression, that they apply to."),
+      runid = schema_int("The unique runid identifying the regression output in the script file. If no output chunk is provided for the regression or post regression command, set null.", allow_null=TRUE),
+      script_file = schema_str("The corresponding name of the Stata script file.", allow_null=TRUE),
+      script_num = schema_int("The number of the script file, map the script file name to the script_num shown in the table of Stata scripts in the prompt.", allow_null=TRUE),
+      code_line = schema_int("The code line of the regression command in the script file.", allow_null=TRUE),
+      wrong_number_cases = schema_arr(descr = "Sometimes, but quite rarely, there was a transcription error when the article was written such that one or multiple numbers shown in the regression table don't correspond to the actual numbers computed by the Stata command in the replication package. If you find such cases for the current regression, note them in this array. Don't note cases where numbers between the Stata output and table only differ because they are rounded to a different number of digits or formatted differently, which is very common and no problem. Usually all numbers are transcribed correctly and this array will be empty. Also don't note here those cells whose number is computed by another (post-)regression command. As explained in the instructions for numbers belonging to this regression but compted by another post regression command, a complete new main entry shall be generated.", items=schema_obj(
+        properties = list(
+          cell_id = schema_str("The cell_id of the table cell showing the wrong number, e.g. 'c2_10'"),
+          wrong_number_in_cell = schema_num("The wrong number shown in the cell. Ignore special formating and just write down the numeric value."),
+          number_in_stata_output = schema_num("The actual number shown in the output of the Stata regression.")
+        )
+      )),
+      problem = schema_str("Did you encounter a problem related to this mapping? If yes describe it here. Typically this field will be empty. Only write something if there is an important problem that substantially hampers this mapping task.", allow_null = TRUE)
+    )),
+    prod_define("map_inv_reg_run",list(
+      runid = schema_int("The unique runid of the regression as stated in the table above. It is also shown in title of the corresponding output chunk of the text file containing all Stata scripts with regression outputs."),
+      script_file = schema_str("The name of the Stata script file that contains the regression."),
+      script_num = schema_int("The corresponding number of the script file as shown in the table of all Stata scripts in the prompt."),
+
+      code_line = schema_int("The code line of the regression command in its Stata script. For regression commands spaning more than one line, use the first code line."),
+      tabid = schema_str("If you can map the regression to a particular table shown in the list above, state here the corresponding tabid. Otherwise set null.", allow_null = TRUE),
+      figid = schema_str("If the regression is used to generate a particular figure in article or appendix, please note here the figure id. For example, if a figure is called 'Figure 5' the figid would be just '5', if a figure is called 'Fugure A.1' the figid would be 'A.1'.", allow_null = TRUE),
+      cell_ids = schema_str("Relevant if the run regression can be mapped to particular table. A comma separated list of all cell ids of those cells in the HTML version of the table that correspond to the specific run regression. E.g. for a table with tabid='2', this comma separated string of cell ids might look like 'c2_10,c2-12,c2-14'. Each cell id can be found as the 'id' tag of the corresponding <td> or <th> element of the HTML version of the article's tables. Only add cells that show numeric results, e.g. estimated coefficient, or number of observations, but no title cells or cells showing variable labels. Some tables in articles are structured such that some descriptive statistics, like the number of observations are shown on the bottom of a column and apply to multiple regressions shown in that column. Add the corresponding cell id for every regression, that they apply to."),
+      problem = schema_str("Did you encounter a problem related to this mapping? If yes describe it here. Typically this field will be empty. Only write something if there is an important problem that substantially hampers this mapping task.", allow_null = TRUE)
+    )),
+    prod_define("reg_classify_static", list(
+      tabid = schema_str("The table ID as stated in the list of regressions above."),
+      regid = schema_int("The regression ID as stated in the field 'regid' in the list of regressions shown above."),
+      short_descr =  schema_str("A short description of what the regression analyzes based on the information in the article.", allow_null = FALSE),
+      is_did_reg = schema_bool("true if the regression performs a difference-in-difference (DID) analysis."),
+      is_rdd_reg = schema_bool("true if the regression performs a regression discontinuity design (RDD) analysis."),
+      is_iv_reg =  schema_bool("true if it is an instrumental varibale regression"),
+      is_iv_first_stage_reg = schema_bool("true if the shown regression results correspond to the first stage regression of an instrumental variable regression (in the script the command could be an iv regression with the option to show first stage results or it could be a separate OLS first stage regression)"),
+      is_placebo_test = schema_bool("true if the regression performs a placebo test, or a similar permutation test."),
+      is_pref_spec_in_tab = schema_bool("Often tables show multiple regression specifications and sometimes the authors state which specification is their preferred specification. Set true if this regression is the preferred specification  among the specifications shown in the table."),
+      is_main_result = schema_bool("true if the regression results are described as main results of the article (compared to robustness checks or additional results)"),
+      is_additional_result = schema_bool("true if the regression shows additional results that are not described as main results of the article"),
+      is_robustness_check = schema_bool("true if the regression is mainly a robustness check for other results."),
+      label_dep_var = schema_str("Based on the information in the article and table find a suitable label for the dependent variable in the regression."),
+      labels_coef_of_interest = schema_str("Often regression tables show both coefficients of primary interest for the analysis and coefficients for control variables that are not of primary interest. Sometimes only coefficient of primary interest are shown. Please state the variable lables of the coefficients of primary interest for this regression as shown in the table. If there are multiple variables of primary interest your string shall be a comma separted list, e.g. 'age,gender'."),
+      cell_id_coef_of_interest = schema_str("Please state the cell ids of all cells for this regression that show the numeric value of the  coefficient of interests or their standard error / p-value / t-value. Return a comma separated list of all those cell_ids, like 'c2_10,c2-12'."),
+      analyses_heterogeneity = schema_bool("true if the  cofficient of interest of the regressions analyze heterogenous effects, e.g. if the regression provided information on how treatment effect sizes differ between subgroups."),
+      error_in_prompt_or_media = schema_str("Is there some inconsistency in the prompt or the attached media files, e.g. the media don't show the tables listed in the prompt etc. This could be an indicator for some error in my pipeline. If such an inconsistency exists, briefly describe it only for the first regression. If all seems ok, set to an empty string. In later regressions always set to an empty string.")
+      
+      
+    ))
+  )
+}
+
+
+
+repbox_other_prods = function() {
+  prods_define(
+    prod_define(
+      "privacy_breach",
+      fields = list(
+        dataset     = schema_str("Exact name of the dataset (file or table)."),
+        variables   = schema_str("Comma‑separated list of variable names that, alone or jointly, create the privacy breach."),
+        explanation = schema_str("Brief justification of why these variables constitute a breach."),
+        risk_level  = schema_str("Severity of the breach: must be one of 'low', 'moderate', or 'high'.", enum=c("low","moderate","high"))
+      )
+    )
+  )  
+}
+
+
+
+schema_html_tab = function(...) {
+  x = schema_str(...)
+  class(x) = union(c("schema_html_tab", "schema_html"), class(x))
+  x
+}
+```
+# END OF FILE: repbox_prods.R
+
+-----------------------------------------------------------
+
+
+# FILE: repbox_tools.R
+```
+# Will probably be moved to repboxUtils
+# but keep them here during development cycle
+
+repbox_art_pdf_file = function(project_dir) {
+  pdf_dir = file.path(project_dir, "art", "pdf")
+  pdf_files = list.files(pdf_dir, glob2rx("*.pdf"), full.names = TRUE)
+  pdf_files
+}
+
+```
+# END OF FILE: repbox_tools.R
+
+-----------------------------------------------------------
+
+
+# FILE: tab_with_ref.R
+```
+rai_tab_with_ref_html = function(doc_dir) {
+  
+}
+```
+# END OF FILE: tab_with_ref.R
+
+-----------------------------------------------------------
+
+
+# FILE: td_background.R
+```
+
+```
+# END OF FILE: td_background.R
+
+-----------------------------------------------------------
+
+
+# FILE: temp_source.R
+```
+# To better develop FuzzyProduction and repboxAI simultaneously
+# we just source FuzzyProduction each time we re-load repboxAI
+
+source_dir = function(dir, verbose=TRUE) {
+  files = list.files(dir, pattern=glob2rx("*.R"),full.names = TRUE)
+  for (f in files) {
+    if (verbose) cat("\nsource ", f)
+    source(f)
+  }
+}
+cat("\nSource FuzzyProduction and repboxTableTools")
+source_dir("~/repbox/gemini/FuzzyProduction/R")
+source_dir("~/repbox/gemini/repboxTableTools/R")
+source_dir("~/repbox/gemini/aikit/R")
+source_dir("~/repbox/repboxDoc/R")
+```
+# END OF FILE: temp_source.R
+
+-----------------------------------------------------------
+
+
+# FILE: test_cell.R
+```
+
+example = function() {
+  project_dir = "~/repbox/projects_share/aejapp_1_2_4"
+
+  ver_dir = "~/repbox/projects_share/aejapp_1_2_4/rai/prod_runs/cell_base/tab_html-n-g2flp-0-pdf-1/r0"
+  ver_dir = "~/repbox/projects_share/aejapp_1_2_4/rai/prod_runs/cell_base/tab_html_hx_pdf/r0"
+  prod_df = ver_load_prod_df(ver_dir=ver_dir)
+  
+  test_cell_base(ver_dir)
+  
+  ver_dirs = test_all_cell_base(project_dir)
+
+}
+
+test_all_cell_base = function(project_dir, overwrite=FALSE) {
+  tests = tests = define_tests_cell_base()
+  prod = repbox_prod("cell_base")
+  fp_dir = project_dir_to_fp_dir(project_dir)
+  ver_dirs = fp_all_ver_dirs(fp_dir, "cell_base")
+  for (ver_dir in ver_dirs) {
+    test_cell_base(ver_dir,prod=prod, tests=tests)
+  }
+  return(ver_dirs)
+}
+
+test_cell_base = function(ver_dir, prod_df=fp_load_prod_df(ver_dir=ver_dir), prod = repbox_prod("cell_base"), tests = define_tests_cell_base()) {
+  restore.point("test_cell_base")
+  tests = define_tests_cell_base()
+  test_df = prod_run_tests(tests,prod_df=prod_df, prod=prod, return_details = TRUE)
+  
+  # create HTML output
+  tab_df = cells_to_tabhtml(cell_df, add_flags=TRUE)
+  rai_write_all_tables_html(tab_df, "table_test.html", ver_dir=ver_dir, title="Tests: cell_base")
+  rstudioapi::filesPaneNavigate(ver_dir)
+}
+
+define_tests_cell_base = function() {
+  tests = prod_tests_define(
+    # flags are already part of cell_base
+    flag_test_funs(
+      function(df, ...) return(df)
+    ),
+    descr = list(),
+    keys = "cellid"
+  )
+    
+}
+```
+# END OF FILE: test_cell.R
+
+-----------------------------------------------------------
+
+
+# FILE: tools.R
+```
+# Will probably be moved to repboxUtils
+# but keep them here during development cycle
+
+example = function() {
+  str = c("a,b,c","b,d","b")
+}
+
+null_to_na = function(x, na_val = NA_character_) {
+  if (is.null(x)) return(na_val)
+  x
+}
+
+has_col = function(x, col) {
+  col %in% names(x)
+}
+
+first_nn = first.non.null = function (...) 
+{
+  args = list(...)
+  for (val in args) {
+    if (!is.null(val)) 
+      return(val)
+  }
+  return(NULL)
+}
+
+invert_names_values = function(x) {
+  y = names(x)
+  names(y) = x
+  y
+}
+
+add_col_left = function(df, ...) {
+  args = list(...)
+  restore.point("add_col_left")
+
+  len = NROW(df)
+  args = lapply(args, function(x) rep(x, length=len))
+  bind_cols(as_tibble(args), df)
+}
+```
+# END OF FILE: tools.R
+
+-----------------------------------------------------------
+
+
+```md
+# repboxAI
+
+Does all sorts of information extraction from scientific articles and reproduction packages using AI an heuristics. Main aspect is to deal with fact that there are many ways to extract information (prompts / models) and many are often imperfect. 
+
+## Concepts
+
+### product 
+
+A product is an extracted data set with well specified columns that strictly follow a provided schema. The different products are defined in `repbox_products()`. 
+
+Here a small subset:
+
+```r
+prods = prods_define(
+  prod_define("tab_list",
+    descr = "List of article's tables",
+    list(
+      tabid = schema_str(maxLength = 10),
+      otabid = schema_str() # ordered tabid by augmenting numbers with 0s from left
+    )
+  ),
+  prod_define("tab_tino",
+    descr = "List of article's tables with extracted title and table notes",
+    widens = "tab_list",
+    list(
+      tabtitle = schema_str(maxLength=400),
+      tabnotes = schema_str(maxLength=2000)
+    )
+  ),
+  prod_define("tab_html",
+    descr = "Contains normalized HTML of every extracted article table",
+    widens = "tab_tino",
+    list(
+      tabhtml = schema_html_tab()
+    )
+  ),
+  prod_define(
+    "cell_list",
+    # means 1 parent row can have multiple children rows
+    parent = "tab_html",
+    from_parent = c("tabid","otabid"),
+    fields = list(
+      cellid = schema_str(),
+      row = schema_int(),
+      col = schema_int(),
+      content = schema_str(),
+      colspan = schema_int(),
+      rowspan = schema_int()
+    )
+  ),
+  prod_define(
+    "cell_base",
+    widens = "cell_list",
+    fields = list(
+      is_num = schema_bool("is_num"),
+      has_deci = schema_bool("has_deci"),
+      braces = schema_str(enum=c("", "(","[","{")),
+      has_sig_star = schema_bool(),
+      sig_star = schema_str()
+    ),
+    descr ="Can be generated purely using heuristics from td_list"
+  )
+)
+```
+
+### version
+
+A version describes a particular process to generate a product, e.g. defined by the AI model and exact prompt. Some versions may use only heuristics, others only AI, others a mix. There will be typically several versions of a product and it is hard to say ex-ante which is the best: we need to create, test, rank and select versions. `repboxAI` helps to deal with multiple versions.
+
+### production run / product instance
+
+Manufacturing the same product version multiple times, may not always yield exactly the same data set. AI results are typically stochastic, thus running the same process to create a version may yield different product instances. 
+
+Results of production run will be stored in the following `run_dir`:
+
+`{project_dir}/rai/prod_runs/{pid}/{vid}/r{run_ind}`
+
+where `pid` is a product id, `vid` is the version id and, `run_ind` is the number of the production run for that particular product version. 
+
+If a production run finished without error then `run_dir` will contain at least:
+
+- `prod_df.Rds` the generated data frame
+- `version.Rds` information about the version
+
+If there was an error it will contain at least the file
+
+- `has_error.txt`
+
+### input products
+
+Creating a product often uses a particular instance of another product as input. We try to store info on the production chain using the files `input_info.Rds` that store infos on the directly used input product instances in each `run_dir`.
+
+### product tests
+
+An important and complex issue will be to test product instances and evaluate them. One can think of different types of tests.
+
+#### Single instance tests 
+
+Have tests that you apply on a single instance. E.g. for `tab_list` check whether `tabid` follows an increasing sequence of table number 1,2,3, A1,A2, ... without holes. Such a particular test can also be used for derrived products like `tab_tino` and `tab_html`. 
+
+#### Multi instance tests 
+
+Compare different product instances. E.g. do two `tab_list` instances have the same vector of `tabid`
+
+#### Ai supported tests
+
+We will have pure heuristic tests, but perhaps also use AI for tests. E.g. decide which extracted table html will be the better on.
+
+## The version network
+
+One important task is to decide on the appropriate set of versions we consider when creating products. One can think of many prompt an model variations. 
+
+If you have two input goods which also have a lot of versions, we also must decide which versions to select for our version. (Even more, we need a rule to select a particular instances). 
+
+As each AI call takes time (and possibly money), we need to think hard on limiting the set of explored product versions. Also version naming is an important issue. Each combination of product id and version id should be unique and not super long!
+
+
+### DDP: directly derived product instances
+
+A `cell_list` instance will be deterministically computed from a `tab_html` instance using our function `normalized_html_tab_to_cell_df`. No AI or any randomness necessary. We have a convention for such *directly derived product instances*:
+
+Each instance of the original product has a corresponding instance of the derived product with the same version id `vid` and `run_ind`. Only the product id `pid` is changed.
+
+For example if an original `tab_html` instance has `run_dir`:
+
+`{project_dir}/rai/prod_runs/tab_html/tab_html_hx_pdf/r5`
+
+then its directly derived product instance of `cell_list` has `run_dir`:
+
+`{project_dir}/rai/prod_runs/cell_list/tab_html_hx_pdf/r5`
+
+`repboxAI` has several helper functions with prefix `ddp_` that help to quickly generate directly derived product instances.
+
+A product may in principle hve both: versions only with directly instances from a parent product or also versions generated by some alternative process.
+
+### backported product instances
+
+The product `tab_tino` is a wider version of `tab_list` with the additionl columns `tabtitle` and `tabnotes`. One could first produce `tab_list` and then add with subsequent AI calls or heuristics the `tabtitle` and `tabnotes`. 
+
+Alternatively, our AI prompt may directly generate a `tab_tino` instance. By removing the columns `tabtitle` and `tabnotes` we can generate a backported `tab_list` instance of this `tab_tino` instance. This might be useful, as our tests for `tab_list` may compare backported versions with other versions. We can then better understand how fine-grained our extraction steps should be.
+
+Naming conventions for backported versions and instances are similar as for directly derived products:
+
+For example, if the `tab_tino` instance has `run_dir`:
+
+`{project_dir}/rai/prod_runs/tab_tino/tab_tino-j-g2f-0-pdf-1/r2`
+
+then the backported `tab_list` instance has `run_dir`:
+
+`{project_dir}/rai/prod_runs/tab_list/tab_tino-j-g2f-0-pdf-1/r2`
+
+# Function prefixed in repboxAI
+
+#### raix_
+
+Extract a product using AI. E.g. `raix_tab_html_pdf` creates `tab_html` instances using AI. The `_pdf` indicates that the AI extracts the information directly from the PDF of the article. 
+
+#### hx_
+
+Extract a product using only heuristics. E.g. `hx_tab_html` creates `tab_html` instances using only heuristic approaches (the stuff that was developed shortly before the advent of AI in `repboxAI`). There are also a few helper functions with the `hx_` prefix related to heuristic product extraction. If extraction uses AI and heurisicts, we would typically use the `raix_` prefix.
+
+#### rai
+
+A `rai` (repbox AI) object stores informations related to a single AI call that will usually be part of an `raix_` extraction function.
+
+There are a lot of `rai_` helper functions. E.g. `rai_context` generates a context object that can contain documents like the article PDF that can be cached using gemini's context caching function. The helper functions automate often repated stuff.
+
+#### rais
+
+Often a `raix_` extraction function makes multiple similar AI calls. For example, when creating a `tab_html` product. We ask the AI separately for each table identified in a  `tab_tino` input, to extract the HTML version and return it. 
+
+A `rais` object stores the relevant information of such multiple AI calls in a nice way to conveniently generate product instances. Even if a `raix_` function uses a single AI call, we will typically generate a `rais` object, since we have created convenience functions like `rais_save` that saves all relevant files of an AI-generated product instance mainly for `rais` objects.
+
+
+### ddp_
+
+Helper functions for directly derived product instances (see further above). 
+
+```
+
+
+## Format of proposed changes to code or text files
+
+When you suggest changes to code or text files or completely new files, you MUST use the following format for each modification. Each change must be enclosed in a `!MODIFICATION` block.
+
+### Overall Structure
+
+Each modification block has three parts:
+1.  Start and end markers: `!MODIFICATION {{what}}` and `!END_MODIFICATION {{what}}`, where {{what}} is just a short reference to what is modified, file name or function name with with file. It will not be parsed but makes it easier for a human to understand blocks.
+2.  A metadata block in **TOML format**. This block ends with a `---` separator line.
+3.  A code payload block, which is a standard markdown code fence.
+
+```
+!MODIFICATION {{what}}
+# TOML metadata goes here
+# ...
+---
+```language
+# New code payload goes here
+```
+!END_MODIFICATION {{what}}
+```
+
+### Modification Scope
+
+Each modification is of one of the following three scopes:
+
+* `file` (re-)writes a complete file
+
+* `function` (re-)writes a complete function (including comments above)
+
+* `lines` (re-)writes only specific lines in a file
+
+
+
+If more than two functions or more than two line edits will be performed in the same file, better rewrite the whole file using a `file` scope. For extremely long files also more smaller edits are ok.
+
+Function scope only works for R code files, but in R files it is preferred if one or two functions in a larger file are changed.
+
+The metadata block **MUST** contain a `scope` field, which can be `"file"`, `"function"`, or `"lines"`.
+
+---
+
+### **Scope 1: `file`**
+
+Use this to create a new file or to completely rewrite an existing one.
+
+**Required Fields:**
+*   `scope = "file"`
+*   `file` (string): The relative path to the file.
+*   `is_new_file` (boolean): `true` if you are creating a new file, `false` if you are rewriting an existing one.
+*   `description` (string): A brief explanation of the change. Always enclose into triple single quotes `'''...'''`.
+
+#### **Example 1.1: Creating a new file**
+!MODIFICATION new_helpers.R
+scope = "file"
+file = "R/new_helpers.R"
+is_new_file = true
+description = '''Create a new file for helper functions.'''
+---
+```r
+# A new helper function
+say_hello <- function(name) {
+  paste("Hello,", name)
+}
+```
+!END_MODIFICATION new_helpers.R
+
+#### **Example 1.2: Rewriting an existing file**
+!MODIFICATION README.md
+scope = "file"
+file = "README.md"
+is_new_file = false
+description = '''Rewrite the README to add installation instructions.'''
+---
+```md
+# My Awesome Project
+
+## Installation
+
+Run `remotes::install_github("user/repo")` to install.
+```
+!END_MODIFICATION README.md
+
+---
+
+### **Scope 2: `function`**
+
+Use this to replace an existing function or to insert a new function. The new code payload should contain the complete function, including any preceding comments.
+
+#### **Fields for replacing an existing function:**
+*   `scope = "function"`
+*   `file` (string): The relative path to the file.
+*   `function_name` (string): The name of the function to be replaced.
+*   `description` (string): A brief explanation of the change. Always enclose into triple single quotes `'''...'''`.
+
+#### **Fields for inserting a new function:**
+*   `scope = "function"`
+*   `file` (string): The relative path to the file.
+*   `description` (string): A brief explanation of the change. Always enclose into triple single quotes `'''...'''`.
+*   **One of** the following fields to specify the insertion point. They are mutually exclusive.
+    *   `insert_top = true`: Insert at the top of the file.
+    *   `insert_bottom = true`: Insert at the bottom of the file.
+    *   `insert_before_fun = "function_name"`: Insert before the specified function.
+    *   `insert_after_fun = "function_name"`: Insert after the specified function.
+
+
+#### **Example 2.1: Replacing an existing function**
+!MODIFICATION calculate_sum utils.R
+scope = "function"
+file = "R/utils.R"
+function_name = "calculate_sum"
+description = '''Update `calculate_sum` to handle NA values correctly.'''
+---
+```r
+#' Calculate the sum of a vector, ignoring NAs
+calculate_sum <- function(vec) {
+  sum(vec, na.rm = TRUE)
+}
+```
+!END_MODIFICATION calculate_sum utils.R
+
+#### **Example 2.2: Inserting a new function at the bottom of a file**
+!MODIFICATION is_positive in R/utils.R
+scope = "function"
+file = "R/utils.R"
+insert_bottom = true
+description = '''Add a new helper function to check for positivity.'''
+---
+```r
+
+#' Check if a number is positive
+is_positive <- function(n) {
+  n > 0
+}
+```
+!END_MODIFICATION is_positive in R/utils.R
+
+#### **Example 2.3: Inserting a new function after a specific function**
+!MODIFICATION is_negative in R/utils.R
+scope = "function"
+file = "R/utils.R"
+insert_after_fun = "is_positive"
+description = '''Add a new helper function `is_negative` after `is_positive`.'''
+---
+```r
+
+#' Check if a number is negative
+is_negative <- function(n) {
+  n < 0
+}
+```
+!END_MODIFICATION is_negative in R/utils.R
+
+---
+
+### **Scope 3: `lines`**
+
+*   `scope = "lines"`
+*   `file` (string): The relative path to the file.
+**One of** the following fields to specify the insertion point. They are mutually exclusive.
+    *   `replace_lines` (string): Exact content of one or multiple subsequent lines that shall be replaced. Try to avoid multiple matches. Only first occurrence will be replaced. Always include complete lines.
+    *   `insert_after_lines` (string): Exact content of one or multiple subsequent lines AFTER which the content shall be added. The content always start a new line. Avoid multiple matches, in case insertion takes place after the first match.
+    *   `insert_top = true`: Insert at the opt of a file .
+    *   `insert_bottom = true`: Insert at the bottom of the file.
+    *   `insert_after_fun = "function_name"`: Insert after the specified function.
+*   `description` (string): A brief explanation of the change. Always enclose into triple single quotes `'''...'''`.
+
+
+#### **Example 3.1: Replacing a line**
+!MODIFICATION lines in DESCRIPTION
+scope = "lines"
+file = "DESCRIPTION"
+replace_lines = "Version: 0.0.1"
+description = '''Update the package version number in the DESCRIPTION file.'''
+---
+```
+Version: 0.0.2
+```
+!END_MODIFICATION lines in DESCRIPTION
+
+#### **Example 3.2: Inserting after a line**
+!MODIFICATION lines in DESCRIPTION
+scope = "lines"
+file = "DESCRIPTION"
+insert_after_lines = "Imports:"
+description = '''Add dplyr to the Imports section in the DESCRIPTION file.'''
+---
+```
+    dplyr (>= 1.0.0)
+```
+!END_MODIFICATION lines in DESCRIPTION
+
+#######################################################
+# Coding Style
+#######################################################
+
+If you write R code follow the following style:
+
+- Prefer = for assignment instead of <-
+- In dplyr verbs don't use .data$x to asses a column x, just write x
+- For string operations use stringi
+
+
+#######################################################
+# YOUR TASK
+#######################################################
+
+Please add a function proc_patches.R that allow to run patches. With a key function fp_run_patches. Implement the ability to perform a patch run shall for map_reg_run and generate a corresponding revised version. The patch can have the proc_id: patch_{{base_proc_id}} and the first revised version r1_{{base_proc_id}} if the base proc_id is already a revised version just make r2_{{original_base_proc_id}} and so on.
+
+Before writing the code modification explain in more detail the key ideas for your code.
+
+Below  are files from other packages that help you understand the concepts and contain functions that you can use.
+
+## fp_patch.R in package FuzzyProduction
+
+```r
+#' Patch a data frame with rows from another data frame using key columns
+#'
+#' Updates rows in a `base_df` with rows from a `patch_df`,
+#' based on a set of key columns. It uses `dplyr::rows_update`.
+#'
+#' @param base_df The data frame to be updated.
+#' @param patch_df A data frame containing the new data for some rows. It must
+#'   contain the key columns and any columns to be updated.
+#' @param by A character vector of column names to use as a key for matching rows.
+#' @return A new data frame with the rows from `base_df` updated with the
+#'   data from `patch_df`.
+#' @export
+fp_patch_df = function(base_df, patch_df, by) {
+  restore.point("fp_patch_df")
+
+  if (!all(by %in% names(base_df))) {
+    missing_cols <- setdiff(by, names(base_df))
+    stop("Key columns '", paste(missing_cols, collapse=", "), "' not found in base_df.")
+  }
+  if (!all(by %in% names(patch_df))) {
+    missing_cols <- setdiff(by, names(patch_df))
+    stop("Key columns '", paste(missing_cols, collapse=", "), "' not found in patch_df.")
+  }
+
+  updated_df <- dplyr::rows_update(base_df, patch_df, by = by)
+
+  return(updated_df)
+}
+
+#' Create a revised product version by applying a patch to a base version
+#'
+#' This function creates a new, improved product version by merging a complete
+#' 'base' version with a 'patch' version that contains corrections. It also
+#' tracks how many times each row has been updated via a `.times_patched` column.
+#'
+#' @param base_ver_dir The version directory of the original, complete product.
+#' @param patch_ver_dir The version directory of the product containing corrections.
+#' @param revised_ver_dir The directory where the new, revised version will be saved.
+#' @param key_cols A character vector of column names to use as a key for merging.
+#' @param prod Optional. The product definition object. If provided, it can be
+#'   used for validation in the future, but is not currently required.
+#' @return The path to the `revised_ver_dir`, invisibly.
+#' @export
+fp_create_revised_version = function(base_ver_dir, patch_ver_dir, revised_ver_dir, key_cols, prod = NULL) {
+  restore.point("fp_create_revised_version")
+
+  # 1. Load the data frames
+  base_df <- fp_load_prod_df(base_ver_dir)
+  patch_df <- fp_load_prod_df(patch_ver_dir)
+
+  # 2. Manage the .times_patched counter
+  # Ensure the base data frame has the tracking column, initializing it to 0 if not present.
+  if (!".times_patched" %in% names(base_df)) {
+    base_df$.times_patched <- 0L
+  }
+
+  # To increment the counter, join the existing counts from base_df to patch_df.
+  key_and_count_df <- dplyr::select(base_df, dplyr::all_of(key_cols), .old_patched_count = .times_patched)
+  patch_df_with_counts <- dplyr::left_join(patch_df, key_and_count_df, by = key_cols)
+
+  # Increment the count. Use replace_na for rows that are new in the patch.
+  # A new row has NA old count -> 0 -> 1. An existing row's count is incremented.
+  patch_df_with_counts$.times_patched <- tidyr::replace_na(patch_df_with_counts$.old_patched_count, 0L) + 1L
+  patch_df_with_final_cols <- dplyr::select(patch_df_with_counts, -.old_patched_count)
+
+  # 3. Create the revised data frame
+  # fp_patch_df will update data columns and also bring in the new .times_patched value.
+  revised_df <- fp_patch_df(base_df, patch_df_with_final_cols, by = key_cols)
+
+  # 4. Save the new revised version and its metadata
+  if (!dir.exists(revised_ver_dir)) {
+    dir.create(revised_ver_dir, recursive = TRUE)
+  }
+
+  # Save the main data product
+  fp_save_prod_df(revised_df, revised_ver_dir)
+
+  # Save metadata about the revision for provenance
+  revision_info <- list(
+    type = "revised_version",
+    base_ver_dir = base_ver_dir,
+    patch_ver_dir = patch_ver_dir,
+    key_cols = key_cols,
+    revision_time = Sys.time()
+  )
+  saveRDS(revision_info, file.path(revised_ver_dir, "revision_info.Rds"))
+
+  cat("\nSuccessfully created revised version in:", revised_ver_dir, "\n")
+  invisible(revised_ver_dir)
+}
+
+
+example_fp_create_revised_version = function() {
+  # This is a conceptual example that runs in a temporary directory.
+  library(dplyr)
+  library(tibble)
+
+  # 1. Setup a mock project structure
+  proj_dir <- file.path(tempdir(), "my_revision_project")
+  if (dir.exists(proj_dir)) unlink(proj_dir, recursive = TRUE)
+
+  # --- Version 1 (Base) ---
+  base_ver_dir_v1 <- file.path(proj_dir, "my_prod/my_proc/v1")
+  dir.create(base_ver_dir_v1, recursive = TRUE)
+  base_df_v1 <- tibble(id = 1:5, value = letters[1:5], status = "original")
+  saveRDS(base_df_v1, file.path(base_ver_dir_v1, "prod_df.Rds"))
+  cat("Created base v1 in:", base_ver_dir_v1, "\n")
+  print(readRDS(file.path(base_ver_dir_v1, "prod_df.Rds")))
+
+  # --- Patch 1 ---
+  patch_ver_dir_1 <- file.path(proj_dir, "my_prod/my_proc_patch/v1")
+  dir.create(patch_ver_dir_1, recursive = TRUE)
+  patch_df_1 <- tibble(id = c(2, 4), value = "revised_once")
+  saveRDS(patch_df_1, file.path(patch_ver_dir_1, "prod_df.Rds"))
+  cat("\nCreated patch 1 in:", patch_ver_dir_1, "\n")
+
+  # --- Revised Version 2 ---
+  revised_ver_dir_v2 <- file.path(proj_dir, "my_prod/my_proc/v2")
+  fp_create_revised_version(
+    base_ver_dir = base_ver_dir_v1,
+    patch_ver_dir = patch_ver_dir_1,
+    revised_ver_dir = revised_ver_dir_v2,
+    key_cols = "id"
+  )
+  revised_df_v2 <- fp_load_prod_df(revised_ver_dir_v2)
+  print(revised_df_v2)
+  # Expected: rows 2 and 4 updated, .times_patched is 1 for them, 0 otherwise.
+
+  # --- Patch 2 (to revise the revised version) ---
+  patch_ver_dir_2 <- file.path(proj_dir, "my_prod/my_proc_patch/v2")
+  dir.create(patch_ver_dir_2, recursive = TRUE)
+  patch_df_2 <- tibble(id = c(2, 5), value = "revised_twice") # row 2 revised again, row 5 for the first time
+  saveRDS(patch_df_2, file.path(patch_ver_dir_2, "prod_df.Rds"))
+  cat("\nCreated patch 2 in:", patch_ver_dir_2, "\n")
+
+  # --- Revised Version 3 ---
+  revised_ver_dir_v3 <- file.path(proj_dir, "my_prod/my_proc/v3")
+  fp_create_revised_version(
+    base_ver_dir = revised_ver_dir_v2, # v2 is the new base
+    patch_ver_dir = patch_ver_dir_2,
+    revised_ver_dir = revised_ver_dir_v3,
+    key_cols = "id"
+  )
+  revised_df_v3 <- fp_load_prod_df(revised_ver_dir_v3)
+  print(revised_df_v3)
+  # Expected:
+  # row 2: "revised_twice", .times_patched is 2.
+  # row 4: "revised_once", .times_patched is 1.
+  # row 5: "revised_twice", .times_patched is 1.
+  # rows 1,3: unchanged, .times_patched is 0.
+
+  # Cleanup
+  unlink(proj_dir, recursive = TRUE)
+}
+```
+
+## patch_prompt.R in package repboxRegmap.R 
+
+```r
+example = function() {
+  library(repboxRegmap)
+  project_dir = "/home/rstudio/repbox/projects_gha_new/aejapp_10_4_6"
+  base_ver_dir = "/home/rstudio/repbox/projects_gha_new/aejapp_10_4_6/fp/prod_art/map_reg_run/g25f-mocr/v0"
+  rstudioapi::filesPaneNavigate(project_dir)
+  options(warn=1)
+  rme = rme_load(project_dir)
+  txt = patch_prompt_map_reg_run_base_results(base_ver_dir, rme)
+  outfile = file.path(project_dir,"fp/eval_art/patch_map_reg_run.md")
+  writeLines(txt, outfile)
+  rstudioapi::filesPaneNavigate(outfile)
+
+  rme = rme_init(project_dir)
+
+}
+
+
+#' Create a string with base results and issues for a patch prompt
+#'
+#' This function generates a markdown-formatted string that summarizes
+#' the previous mapping results and flagged issues for specific tables.
+#' This string is intended to be used as part of a larger prompt for an
+#' AI to "patch" or correct the initial mappings. The function is
+#' structured with explicit blocks for each check to allow for easy
+#' manual customization (e.g., changing descriptions or filtering checks).
+#'
+#' @param base_ver_dir The directory of the base mapping version to report on.
+#' @param rme The rme object containing all data and evaluation results.
+#' @return A character string with the formatted summary.
+patch_prompt_map_reg_run_base_results = function(base_ver_dir, rme) {
+  restore.point("patch_prompt_map_reg_run_base_results")
+
+  map_version = fp_ver_dir_to_ver_id(base_ver_dir)
+
+  # Filter for all issues related to the specified base version
+
+  ignore_tests = c("runids_differ")
+
+  all_issues = rme_combine_ev_df(rme) %>%
+    dplyr::filter(map_version == .env$map_version, !test_name %in% ignore_tests)
+
+  if (NROW(all_issues) == 0) {
+    return("No issues found.")
+  }
+
+  # Consider only tabids that have issues
+  tabids = repboxTableTools::sort_tabids(unique(all_issues$tabid))
+  tab_str = sapply(tabids,patch_prompt_base_results_for_tab, rme=rme, map_version=map_version)
+  main_str = paste0(tab_str, collapse="\n")
+
+  return(main_str)
+}
+
+#' Generates a markdown summary of issues for a single table
+patch_prompt_base_results_for_tab = function(tabid, rme, map_version) {
+  tid = tabid; ver_id = map_version
+  restore.point("patch_prompt_base_results_for_tab")
+
+  table_str = paste0("\n\n## Table ", tid)
+
+  # 1. Show the previous mapping result for this table
+  prev_map = rme$map_reg_run %>%
+    dplyr::filter(ver_id == .env$map_version, tabid == tid) %>%
+    dplyr::select(any_of(c("reg_ind", "runid", "script_file", "code_line", "cell_ids", "problem", "wrong_number_cases")))
+
+  map_json = jsonlite::toJSON(prev_map, pretty = TRUE, auto_unbox = TRUE)
+
+  table_str = paste0(table_str,
+    "\n\n### Previous Mapping Result\n\n",
+    "```json\n",
+    map_json,
+    "\n```\n",
+    "\n\n### Flagged Potential Issues"
+  )
+
+  # Helper to get the issues for a specific test, filtered for the current table/version
+  get_test_df = function(test_name) {
+    if (!test_name %in% names(rme$evals)) return(tibble::tibble())
+    df = rme$evals[[test_name]]
+    if (is.null(df) || NROW(df) == 0) return(tibble::tibble())
+
+    df = dplyr::ungroup(df)
+    if ("map_version" %in% names(df)) df = dplyr::filter(df, map_version == ver_id)
+    if ("tabid" %in% names(df)) df = dplyr::filter(df, tabid == tid)
+    df
+  }
+
+  # Helper to append a formatted test result to the main string
+  num_tests = 0
+
+  note_test = function(test_name, descr, df) {
+    cat("\nNoted: ", test_name, " for Table ", tid, " with ", NROW(df), " flagged rows.\n")
+    num_tests <<- num_tests+1
+    table_str <<- paste0(table_str,
+      "\n\n#### Flagged Issue: `", test_name, "`\n\n",
+      "", descr, "\n\n")
+    if (is.null(df) || NROW(df)==0) return(invisible(table_str))
+
+    table_str <<- paste0(table_str,
+      df_to_markdown(df %>% dplyr::select(-any_of(c("map_version", "tabid"))))
+    )
+    invisible(table_str)
+  }
+
+  # --- Manual blocks for each check ---
+
+  # Ignore runids_differ, non_reg_cmd
+
+  # Check: invalid_cellids
+  test_name = "invalid_cellids"
+  df = get_test_df(test_name)
+  if (NROW(df) > 0) {
+    # long_descr = **Invalid `cellid` Mapping.** This test flags mappings that reference a `cellid` that does not exist in the parsed table data (`cell_df`). This is a critical integrity error, indicating a hallucinated or malformed cell reference from the AI.
+    descr = "**Invalid `cell_id` Mapping.** This test flags mappings that reference a `cell_id` that does not exist in the parsed table data. This indicates a hallucinated or malformed cell reference from the AI."
+    note_test(test_name, descr, df)
+  }
+
+  # Check: coef_se_match
+  test_name = "coef_se_match"
+  df = get_test_df(test_name) # df from heuristic
+
+  # Get wrong numbers identified by the previous AI run for this table
+  wn_df = rme$map_reg_run %>%
+    dplyr::filter(ver_id == .env$ver_id, tabid == tid, !sapply(wrong_number_cases, is.null))
+
+  has_ai_wn = NROW(wn_df) > 0
+  if (has_ai_wn) {
+    wn_df = wn_df %>%
+      dplyr::select(reg_ind, wrong_number_cases) %>%
+      tidyr::unnest(wrong_number_cases)
+    if (NROW(wn_df)==0) {
+      wn_df$cellid = character(0)
+    } else {
+      wn_df = wn_df %>%
+      dplyr::rename(cellid = cell_id) # Rename for consistent joining
+    }
+  }
+
+  # Only create a section if either heuristic or AI found something.
+  if (NROW(df) > 0 || has_ai_wn) {
+    # Heuristics found issues that AI missed
+    ai_miss_df = if (has_ai_wn) df %>% dplyr::anti_join(wn_df, by = "cellid") else df
+    # AI found issues that heuristics missed
+    ai_extra_df = if (has_ai_wn) wn_df %>% dplyr::anti_join(df, by = "cellid") else tibble::tibble()
+    # Issues found by both
+    common_df = if (has_ai_wn) df %>% dplyr::inner_join(wn_df, by = "cellid") else tibble::tibble()
+
+    common_str = ""
+    if (NROW(common_df) > 0) {
+      common_str =  paste0(
+        "\n\n- **Agreed Mismatches:** Both our heuristic and the previous AI run identified potential transcription errors for the following cells. Please verify and include them in `wrong_number_cases`:\n\n",
+        df_to_markdown(common_df %>% dplyr::select(cellid, table_val, true_val_cand, issue, details))
+      )
+    }
+
+    miss_str = ""
+    if (NROW(ai_miss_df) > 0) {
+      miss_str =  paste0("\n\n- **Mismatches Missed by AI:** Our heuristic found the following potential errors that the previous AI run did *not* report. Please review them. If they are genuine errors, add them to `wrong_number_cases` in your new mapping:\n\n",
+        df_to_markdown(ai_miss_df %>% dplyr::select(cellid, table_val, true_val_cand, issue, details)))
+    }
+
+    extra_str = ""
+    if (NROW(ai_extra_df) > 0) {
+      extra_str =  paste0("\n\n- **Mismatches Only Found by AI:** The previous AI reported these errors, but our heuristic did *not* find them. Please double-check if these are real errors. If they are not, do not include them in `wrong_number_cases` this time:\n\n",
+        df_to_markdown(ai_extra_df %>% dplyr::select(any_of(c("cellid", "wrong_number_in_cell", "number_in_stata_output")))))
+    }
+
+    # Only report if there is something to report
+    if (nchar(common_str)>0 | nchar(miss_str)>0 | nchar(extra_str)>0) {
+      descr = paste0("**Review of Potential Transcription Errors.** We have compared the numeric mismatches found by our heuristic checks against those reported in the previous AI run. Please review the lists below.", common_str, miss_str, extra_str)
+      note_test(test_name, descr, NULL)
+    } else if (NROW(df) > 0) {
+       # Perfect agreement and errors were found
+       descr = "**Mismatch Detection Agreement.** Our heuristic checks confirm all the potential transcription errors reported by the previous AI run. Please review them and include them in `wrong_number_cases`:"
+       note_test(test_name, descr, df)
+    }
+  }
+
+  # Check: single_col_reg
+  test_name = "single_col_reg"
+  df = get_test_df(test_name)
+  if (NROW(df) > 0) {
+    # long_descr = **Regression Spans Multiple Columns.** Regressions are typically presented in a single column. This test flags regressions whose mapped cells span multiple columns without a clear structural reason (like having standard errors in an adjacent column). This often indicates that cells from different regressions have been incorrectly grouped together.
+    descr = "**Regression Spans Multiple Columns.** A single regression has been mapped to cells in multiple columns, which is unusual but can happen in some cases. E.g.
+
+  - SEs are in an adjacent column instead of below the coefficient.
+
+  - If a balancing table is generated using regressions sometimes a regression spans one or two rows instead of a column.
+
+  But sometimes having mapped cells from multiple columns for a regression can indicated an mistake in the mapping, so please check again."
+    note_test(test_name, descr, df)
+  }
+
+  # Check: multicol_reg_plausibility
+  test_name = "multicol_reg_plausibility"
+  df = get_test_df(test_name)
+  if (NROW(df) > 0) {
+    # long_descr = **Implausible Multi-Column Structure.** For a regression that legitimately spans multiple columns, we expect to find rows with numbers in more than one of those columns. This test flags multi-column regressions where every row *only* has a value in one column, suggesting a 'slip' where different rows of the same conceptual regression were incorrectly assigned to different columns.
+    descr = "**Implausible Multi-Column Structure.** A regression spans multiple columns, but each row only has a value in one of those columns. This typcially suggests an inconsistent mapping across rows, but there might be exceptions."
+    note_test(test_name, descr, df)
+  }
+
+  # Check: overlapping_regs
+  test_name = "overlapping_regs"
+  df = get_test_df(test_name)
+  if (NROW(df) > 0) {
+    descr = "**Overlapping Regression Mappings.** A single cell (identified as a coefficient) has been mapped to more than one regression. This can well indicate a mapping error."
+    note_test(test_name, descr, df)
+  }
+
+  # Check: missing_se_mapping
+  test_name = "missing_se_mapping"
+  df = get_test_df(test_name)
+  if (NROW(df) > 0) {
+    # long_descr = **Unmapped Standard Error.** This test flags cases where a mapped coefficient cell has an associated standard error (a value in parentheses, typically below the coefficient) that was *not* included in the regression mapping. It also reports whether the numeric value of that unmapped SE would have been a correct match for the regression's output, helping to distinguish simple mapping omissions from more complex issues.
+    descr = "**Unmapped Standard Error.** A coefficient was mapped, but its associated standard error (or t-value, p-value ..., we mean the value in parentheses) was not included in the mapping. Check if it should be added."
+    note_test(test_name, descr, df)
+  }
+
+  # Check: consistent_reg_ind_in_col
+  test_name = "consistent_reg_ind_in_col"
+  df = get_test_df(test_name)
+  if (NROW(df) > 0) {
+    # long_descr = **Inconsistent `reg_ind` in Column.** In a column that maps to a single main regression, all mapped cells (including post-estimation stats) should share the same `reg_ind`. This check flags columns where cells are assigned to multiple different `reg_ind`s, suggesting a mapping inconsistency.
+    descr = "**Inconsistent `reg_ind` in Column.** Within a single table column that seems to represent one regression, cells have been mapped to different regression indices (`reg_ind`). This can be correct if a column contains results from multiple regressions, but often indicates a mapping error. Please review."
+    note_test(test_name, descr, df)
+  }
+
+  # Check: post_est_reg_match
+  test_name = "post_est_reg_match"
+  df = get_test_df(test_name)
+  if (NROW(df) > 0) {
+    # long_descr = **Mismatched Post-Estimation Command.** In a column corresponding to a single regression, any post-estimation commands (e.g., `test`, `summarize`) should be associated with that main regression. This check flags cases where a post-estimation command's associated `reg_runid` does not match the main regression's `runid` for that column.
+    descr = "**Mismatched Post-Estimation Command.** A post-estimation command (like a test statistic) in a regression column appears to be linked to the wrong regression run. Our heuristic check which post-regression runid is closest to the runid of the mapped regression in the table column. But in particular if there are multiple regressions in a table column, the heuristic may be wrong. But take a look it."
+    note_test(test_name, descr, df)
+  }
+
+  # Check: value_match_other_cmd
+  test_name = "value_match_other_cmd"
+  df = get_test_df(test_name)
+  if (NROW(df) > 0) {
+    # long_descr = **Value Mismatch for Other Commands.** This check verifies if numeric values in cells mapped to non-regression commands (e.g., `summarize`, `display`) can be found in the raw output of that command. It checks for a match after rounding the output values to the same number of decimal places as the table value.
+    descr = "**Value Mismatch for Other Commands.** The value in a cell mapped to a non-regression command (like `summarize`) was not found in the command's Stata output. This could be a mapping error (the cell is linked to the wrong command) or a transcription error in the table. If it is a transcription error, please add it to the `wrong_number_cases` array for the correct mapping entry."
+    note_test(test_name, descr, df)
+  }
+
+  # Check: mapped_to_line_not_run
+  test_name = "mapped_to_line_not_run"
+  df = get_test_df(test_name)
+  if (NROW(df) > 0) {
+    # long_descr = **Mapped to Code Line but not a `runid`.** This flags cells that are mapped to a specific line in a script but are not associated with a `runid` (i.e., a specific execution output). While sometimes intentional for un-executed code, numeric cells in a results table should be mapped to a `runid`. If a numeric cell cannot be mapped to a specific `runid`, both `runid` and `code_line` should ideally be to indicate it belongs to the conceptual regression without a direct code link.
+    descr = "**Mapped to Code Line but not a `runid`.** Cells are mapped to a line of code, but not to a specific output run (`runid`). Numeric results should generally be linked to a `runid` if the outut is shown. The previous AI run might have not yet seen the Stata output and runid, but now we have added every Stata output from the code lines listed below. Make sure to add for those cases the runid now, if you think the mapping is still valid after seeing the output. Otherwise modify the mapping."
+    note_test(test_name, descr, df)
+  }
+
+
+  if (num_tests == 0) table_str = "-- No issues found --"
+
+  # The check consistent_vertical_structure is omitted as it is less about a single
+  # mapping's correctness and more about overall table consistency.
+
+  return(table_str)
+}
+```
+
+

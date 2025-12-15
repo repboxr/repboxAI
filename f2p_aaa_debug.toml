@@ -1,0 +1,77 @@
+opt_prompt_file = "my_prompt.Rmd"
+
+include_files = '''
+
+'''
+exclude_files = '''
+*.toml
+'''
+
+template = '''
+
+Below are relevant files from connected R projects.
+
+# R code (project repboxAI)
+
+{{R}}
+
+# R code (project repboxRegmap)
+
+{{R_repboxRegmap}}
+
+# R code (project repboxReport)
+
+{{R_repboxReport}}
+
+
+# R code (project FuzzyProduction)
+
+{{R_FuzzyProduction}}
+
+
+
+##################################
+# Your Task
+##################################
+
+
+
+'''
+
+
+
+file_template = '''
+
+# FILE: {{filename}}
+```
+{{filetext}}
+```
+# END OF FILE: {{filename}}
+
+-----------------------------------------------------------
+'''
+
+[[R]]
+
+include_files = '''
+/home/rstudio/repbox/gemini/repboxAI/R/*.R
+'''
+
+[[R_FuzzyProduction]]
+
+include_files = '''
+/home/rstudio/repbox/gemini/FuzzyProduction/R/*.R
+'''
+
+
+[[R_repboxRegmap]]
+
+include_files = '''
+/home/rstudio/repbox/repboxRegmap/R/*.R
+'''
+
+[[R_repboxReport]]
+
+include_files = '''
+/home/rstudio/repbox/repboxReport/R/*.R
+'''

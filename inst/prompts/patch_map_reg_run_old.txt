@@ -1,33 +1,49 @@
 You are an economic research assisstant that helps to extract information from scientific articles. You work very carefully.
 
-Attached is an {{doc_type_descr}}. We have already asked an AI to map regression results shown in the tables of the articles to Stata commands from the reproduction package. Then we have run some consistency checks in order to possibly detect errors in the mapping or the extracted table.
+Attached is an {{doc_type_descr}}. We want to extract information from tables that show regressions. 
 
-For Table {{tabid}} (tabid="{{tabid}}") our tests suggested issues. Attached is an HTML file that contains an AI generated HTML representation of the table and a description of the found issues. Each each <td> and <th> cell is identified with a unique cell id. For cells that are related to the mentioned issue the cell has a class marking that issue.
+There was a previous extraction run, but we flagged some potential issues, that you may want to patch in this run.
 
-We have also added a PNG image of the HTML table where different backkground colors indicate the different regression commands each cell has been mapped to.
+Here is a list of all tables for which potential issues were flagged {{cur_doc}}:
 
-Also a attached is a large text file that contains the Stata do files including the outputs for successfully run regression commands. Output chunks are interweaved with the code and each output chunk is identified by a unique runid. The text file contains the following Stata do files:
+{{tab_list}}
+
+Attached is an HTML file that contains an HTML representation of each of those tables, with each <td> and <th> cell identified with a unique cell ID.
+
+
+Also a attached is a large text file that contains the Stata do files including the outputs for successfully run regression and post-regression commands, as well as for commands related to shown regressions that were linked in the previous mapping rn. Output chunks are interweaved with the code and each output chunk is identified by a unique `runid`. The text file contains the following Stata do files:
 
 {{script_list}}
 
-The initial mapping task was the following:
+# Results of previous mapping run and flagged potential issues
 
---- Original Instructions ---
+Below are the extracted results from the previous runs and a description of the flagged potential issues arranged by table.
 
-1. Create for every regression shown in the table at least one entry in the JSON array specified below. In particular you shall identify the runid, line number and script of the regression output that is mapped to a particular regression shown in the table. You shall also write down the identifiers of all the cells in the table that show numbers related to that regression.
+{{base_results}}
 
 
-2. Sometimes the information related to an regression in certain cells is not computed by the main regression command in Stata, but by a post regression command. This can e.g. be the case for a particular test related to this regression. If that is the case, generate a separate entry in the JSON array for every different Stata command that generates a number related to the regression shown in the table. For some post regression commands we don't have ouput chunks and no runid, then just map the script and line number. Make sure that all entries refering to the same regression have the same value for the field "regid" that specifies the regression.
+# Your task
 
-3. Often multiple table cell correspond to the same regression "regid" and the same Stata "code _line". For those cells only generate a single entry in the JSON array, where all cell ids are included as comma separated string in the field "cell_ids".
+Your task is the following:
+
+Go through every table shown above were some issues were flagged.
+
+Consider the flagged issues. Some may be false alarm at deeper inspection, others might indicate genuine problems in the previous mapping run that should be solved.
+
+Perform again the COMPLETE mapping for every table listed above, even if you think that for a table the issues were false alarm and you would not change anything. 
+
+Your mapping shall be as follows:
+
+Create for every regression shown in the table at least one entry in the JSON array specified below. In particular you shall identify the runid, line number and script of the regression output that is mapped to a particular regression shown in the table. You shall also write down the identifiers of all the cells in the table that show numbers related to that regression.
+
+
+Sometimes the information related to an regression in certain cells is not computed by the main regression command in Stata, but by a post regression command. This can e.g. be the case for a particular test related to this regression. If that is the case, generate a separate entry in the JSON array for every different Stata command that generates a number related to the regression shown in the table. If we don' have included ouput chunks with runid for such a post regression command, just map the script_file, script_num and line number. Make sure that all entries referring to the same regression have the same value for the field "regid" that specifies the regression.
+
+Often multiple table cell correspond to the same regression "regid" and the same Stata "code_line". For those cells only generate a single entry in the JSON array, where all cell ids are included as comma separated string in the field "cell_ids".
 
 If you cannot determine the value of any field set it to null.
 
-
---- End original instructions ---
-
-You shall now redo the mapping taking into account the results of the consistency checks given to you. You are asked to return your results in a structured JSON format following the JSON response schema shown below. In the final field "problem" you can give feedback whether that regression was involved in a relevant issue and whether you have resolved it.
-
+Just return a JSON output according to the response schema below.
 
 JSON RESPONSE SCHEMA:
 
@@ -38,7 +54,7 @@ JSON RESPONSE SCHEMA:
     "properties": {
       "tabid": {
         "type": "string",
-        "description": "Just the tabid used for this rerun, i.e. \"{{tabid}}\" "
+        "description": "The table ID as stated in the list of tables above."
       },
       "regid": {
         "type": "string",
@@ -50,7 +66,7 @@ JSON RESPONSE SCHEMA:
       },
       "runid": {
         "type": ["integer", "null"],
-        "description": "The unique runid identifying the regression output in the script file or the output of the post regression command. Only if for some reason no output chunk is provided for the regression or post regression command, set null."
+        "description": "The unique runid identifying the regression output in the script file. If no output chunk is provided for the regression or post regression command, set null."
       },
       "script_file": {
         "type": ["string", "null"],
@@ -87,11 +103,7 @@ JSON RESPONSE SCHEMA:
       },
       "problem": {
         "type": ["string", "null"],
-        "description": "Was this mapping involved into a stated issue? If yes, did you resolve it, or not? Was it actually really a problem or did the consistency check just wrongly flag it?"
-      }
-      "patched_this_reg": {
-        "type": "boolean"
-        "description": "Did you patch anything for this specific regression?"
+        "description": "Did you encounter a problem related to this mapping? If yes describe it here. Typically this field will be empty. Only write something if there is an important problem that substantially hampers this mapping task."
       }
     }
   }

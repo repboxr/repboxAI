@@ -325,12 +325,22 @@ proc_rai_pru_run = function(pru) {
         values$tabtitle = tab_df$tabtitle
       }
       
-            
+      if ("tabid" %in% pru$tpl_var & isTRUE(pru$itemize_by=="tab_df")) {
+        values$tabid = tab_df$tabid
+      }
+
       if ("tab_list" %in% pru$tpl_var & isTRUE(pru$itemize_by=="tab_df")) {
         values = rai_prompt_value_tab_list(tab_df, values)
       }
       
-      if (pru$add_by_tab_media) {
+      if (!is.null(pru$by_tab_media_fun)) {
+        by_tab_media_files = do.call(pru$by_tab_media_fun, list(pru=pru, tabid = tab_df$tabid))
+        media_files = c(media_files, by_tab_media_files)
+        rai$media_files = media_files
+
+      }
+      
+      if (isTRUE(pru$add_by_tab_media)) {
         tabid = tab_df$tabid
         outfile = file.path(pru$project_dir,"fp","prompt_files",paste0("tab--",tabid,".html"))
         html = rai_media_tab_html(pru$project_dir,tabid = tabid, tab_main = tab_df, all_ref_li=pru[["all_ref_li"]], all_part_df = pru[["all_part_df"]], outfile=outfile)

@@ -344,7 +344,6 @@ repbox_other_prods = function() {
 }
 
 
-
 schema_html_tab = function(...) {
   x = schema_str(...)
   class(x) = union(c("schema_html_tab", "schema_html"), class(x))

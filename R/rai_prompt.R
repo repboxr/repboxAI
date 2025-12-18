@@ -32,6 +32,23 @@ rai_prompt_value_reg_list_static = function(map_df, values=list()) {
   values
 }
 
+rai_prompt_value_reg_list = function(map_df, values=list(), static=FALSE) {
+  # Transform map_df to reg_df
+  if (static) return(rai_prompt_value_reg_list_static(map_df, values))
+  map_df = rename.cols(map_df, "do_file","script_file")
+  reg_df = map_df %>%
+    group_by(tabid, regid) %>%
+    summarize(
+      cell_ids = merge_unique_comma_str(cell_ids),
+      script_files = merge_unique_comma_str(script_file),
+      code_lines = merge_unique_comma_str(code_line),
+      run_ids = merge_unique_comma_str(runid)
+    ) %>%
+    ungroup()
+  values$reg_list = text_table(reg_df)
+  values
+}
+
 
 rai_prompt_value_reg_run_list = function(reg_df, values=list()) {
   values$reg_run_list = text_table(reg_df[c("runid")])

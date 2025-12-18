@@ -4,13 +4,37 @@ doc_file_form_default_pref = function() {
 }
 
 tab_df_default_pref = function(prod_id = "tab_main") {
-  glob2rx(c("html","pdf-g*","mocr","pdf_txt"))
+  rai_prefs(c("mocr", "html","pdf-g*","pdf_txt"), prio_mocr=FALSE)
 }
+
+map_reg_default_pref = function(map_version=NULL) {
+  rai_prefs()
+}
+
+rai_prefs = function(globs = c("gp30*","gp25*","gf30*","gf25*","gfl25*"), prio_rev=TRUE, prio_mocr=TRUE) {
+  if (prio_rev) {
+    globs = unlist(lapply(globs, function(glob) c(paste0("r*_", glob),glob)))
+  }
+  if (prio_mocr) {
+    globs = c(paste0(globs,"mocr*"), globs)
+  }
+  glob2rx(globs)
+}
+
+
+pref_prio_revision = function(prefs) {
+  unlist(lapply(prefs, function(pref) c(paste0("r*_", pref),pref)))
+}
+pref_prio_mocr = function(prefs) {
+  c(prefs)
+}
+
 
 
 map_reg_static_default_pref = function() {
-  glob2rx(c("gp25*mocr*","gp25*"))
+  map_reg_default_pref()
 }
+
 
 
 tab_ref_default_pref = function() {

@@ -6,7 +6,6 @@ R/load.R
 R/media_run_do.R
 R/proc_all.R
 R/proc_cell.R
-R/proc_debug_rerun.R
 R/proc_info.R
 R/proc_patches.R
 R/proc_readme.R
@@ -27,3 +26,4 @@ R/td_background.R
 R/temp_source.R
 R/test_cell.R
 R/tools.R
+pipeline.md

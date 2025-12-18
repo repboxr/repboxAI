@@ -46,7 +46,7 @@ JSON RESPONSE SCHEMA:
       },
       "cell_ids": {
         "type": "string",
-        "description": "A comma separated list of all cell ids of those cells in the HTML version of the table that correspond to this specific regression and whose value was computed by the specified code line and correspond to the specified output. E.g. for a table with tabid='2', this comma separated string of cell ids might look like 'c2_10,c2_12,c2_14'. Each cell id can be found as the 'id' tag of the corresponding <td> or <th> element of the HTML version of the article's table. Only add cells that show numeric results, e.g. estimated coefficient, or number of observations, but no title cells or cells showing variable labels. Don't add here cells that belong to the regression but are computed in another (post-)regression command. For those cells a separate entry shall be generated. Some tables in articles are structured such that some descriptive statistics, like the number of observations are shown on the bottom of a column and apply to multiple regressions shown in that column. Add the cell ids of such statistics to every regression, that they apply to."
+        "description": "A comma separated list of all cell ids of those cells in the HTML version of the table that correspond to this specific regression and whose value was computed by the specified code line and correspond to the specified output. E.g. for a table with tabid='2', this comma separated string of cell ids might look like 'c2_10,c2_12,c2_14'. Each cell id can be found as the 'id' tag of the corresponding <td> or <th> element of the HTML version of the article's table. Only add cells that show numeric results, e.g. estimated coefficient, or number of observations, but no title cells or cells showing variable labels. Don't add here cells that belong to the regression but are computed in another (post-)regression command. For those cells a separate entry shall be generated. Some tables in articles are structured such that some descriptive statistics, like the number of observations are shown on the bottom of a column and apply to multiple regressions shown in that column. Add the cell ids of such statistics to every regression, that they apply to. Also add all cells whose number logically should be computed from the regression command but where the number in the table was not correct. Authors often make mistakes when copying Stata results to the article. We will later flag those numeric cells with transcription errors in another step, but all cells with transcription error should still be part of this mapping. "
       },
       "runid": {
         "type": ["integer", "null"],
@@ -88,9 +88,13 @@ JSON RESPONSE SCHEMA:
       "problem": {
         "type": ["string", "null"],
         "description": "Was this mapping involved into a stated issue? If yes, did you resolve it, or not? Was it actually really a problem or did the consistency check just wrongly flag it?"
+      },
+      "table_structure_ok": {
+        "type": "boolean",
+        description: "Was there a fundamental problem when parsing the HTML version of the table from the original article that prevents correct mapping of this regression? Usually tables are correctly parsed. What matters are the numbers and arrangement of cells not whether some labels are not perfectly correct. But sometimes the table parser might have had problems and the mapping step cannot solve it."
       }
       "patched_this_reg": {
-        "type": "boolean"
+        "type": "boolean",
         "description": "Did you patch anything for this specific regression?"
       }
     }

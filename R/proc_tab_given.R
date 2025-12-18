@@ -91,19 +91,3 @@ proc_doc_tab_given = function(doc_dir, to_v0=TRUE) {
   #rstudioapi::filesPaneNavigate(pru$ver_dir)
   invisible(pru)
 }
-
-# rdoc_process instead
-# 
-# # Think of what should be called by make_ejd
-# rdoc_prepare_hx = function(doc_dir) {
-#   doc_form = rdoc_form(doc_dir)
-#   if (doc_form=="mocr") {
-#     repboxDoc::rdoc_mocr_process(doc_dir)
-#   } else if (doc_form == "pdf") {
-#     rdoc_pdf_to_txt_pages(doc_dir)
-#     rdoc_pdf_pages_to_parts(doc_dir)
-#     rdoc_pdf_extract_tabs(doc_dir)
-#   } else if (doc_form == "html") {
-#     rdoc_html_to_parts(doc_dir) 
-#   }
-# }

@@ -9,9 +9,11 @@ repbox_default_fp_analysis = function(project_dir) {
     rstudioapi::filesPaneNavigate(project_dir)
   
   rgemini::set_gemini_api_key(file = "~/repbox/gemini/gemini_api_key.txt")
+  set_ai_opts(model = "gemini-3-pro-preview")
   set_ai_opts(model = "gemini-2.5-flash")
 
   steps = repbox_fp_steps(map_reg_run = TRUE)
+  steps = repbox_fp_steps(reg_classify = TRUE)
   repbox_run_fp(project_dir,steps, overwrite = FALSE)
 
     
@@ -86,7 +88,7 @@ example = function() {
   
   
   steps = repbox_fp_steps(map_reg_static = TRUE)
-  steps = repbox_fp_steps(reg_classify_static = TRUE)
+  steps = repbox_fp_steps(reg_classify = TRUE)
   steps = repbox_fp_steps(tab_given = TRUE)
   project_dirs = repboxExplore::get_project_dirs("~/repbox/projects_share")
   #project_dir = project_dirs[1]
@@ -120,6 +122,15 @@ example = function() {
   
 }
 
+
+# Implement default pipeline
+# see pipeline.md
+# Implement default pipeline
+# see pipeline.md
+repbox_fp_steps_pipeline = function(tab_given=TRUE,ev_tab=TRUE, map_reg_run=TRUE,  reg_classify=TRUE, ...) {
+  repbox_fp_steps(tab_given=tab_given, map_reg_run=map_reg_run, ev_tab=ev_tab, map_reg_run=map_reg_run, reg_classify=reg_classify, ...)
+}
+
 repbox_fp_join_steps = function(...) {
   step_li = list(...)
   restore.point("repbox_fp_join_steps")
@@ -145,12 +156,12 @@ repbox_fp_readme_steps = function(readme=FALSE, readme_overview=FALSE, readme_va
   as.list(sys.frame(sys.parent(0)))  
 }
 
-repbox_fp_steps = function(tab_given=FALSE, tab_notes_pdf=FALSE, tab_html_pdf=FALSE, tab_main=FALSE, ev_tab=FALSE, tab_classify = FALSE, by_tab_classify = FALSE, by_tab_classify_nodoc=FALSE, map_reg_static = FALSE, reg_classify_static=FALSE, map_reg_run=FALSE, map_inv_reg_run=FALSE) {
+repbox_fp_steps = function(tab_given=FALSE, tab_notes_pdf=FALSE, tab_html_pdf=FALSE, tab_main=FALSE, ev_tab=FALSE, tab_classify = FALSE, by_tab_classify = FALSE, by_tab_classify_nodoc=FALSE, map_reg_static = FALSE,  map_reg_run=FALSE, map_inv_reg_run=FALSE, reg_classify=FALSE) {
   as.list(sys.frame(sys.parent(0)))
 }
 
 
-repbox_fp_steps_from = function(tab_given=FALSE, tab_notes_pdf=tab_given, tab_html_pdf=tab_notes_pdf, tab_main=tab_html_pdf, ev_tab=tab_main,  tab_classify = ev_tab, by_tab_classify = FALSE, by_tab_classify_nodoc=FALSE, map_reg_static = by_tab_classify_nodoc | tab_classify, reg_classify_static=map_reg_static, map_reg_run = reg_classify_static, map_inv_reg_run = map_reg_run) {
+repbox_fp_steps_from = function(tab_given=FALSE, tab_notes_pdf=tab_given, tab_html_pdf=tab_notes_pdf, tab_main=tab_html_pdf, ev_tab=tab_main,  tab_classify = ev_tab,reg_classify= TRUE, map_reg_run = TRUE, by_tab_classify = FALSE, by_tab_classify_nodoc=FALSE, map_reg_static = FALSE,  map_inv_reg_run = FALSE) {
   as.list(sys.frame(sys.parent(0)))
 }
 
@@ -164,42 +175,42 @@ repbox_run_fp = function(project_dir, steps = repbox_fp_steps_from(TRUE), overwr
   } else {
     doc_type = all_doc_types
   }
-  if (steps$tab_given) {
+  if (isTRUE(steps$tab_given)) {
     proc_tab_given(project_dir, doc_type=doc_type)
   }
   pdf_doc_dirs = repbox_doc_dirs(project_dir, doc_form="pdf", doc_type=doc_type)
-  if (steps$tab_notes_pdf) {
+  if (isTRUE(steps$tab_notes_pdf)) {
     proc_tab_notes_from_pdf(project_dir, doc_type=doc_type, overwrite = overwrite)
   }
-  if (steps$tab_html_pdf) {
+  if (isTRUE(steps$tab_html_pdf)) {
     proc_tab_html_from_pdf(project_dir,doc_type = doc_type, overwrite=overwrite)
   }
-  if (steps$tab_main) {
+  if (isTRUE(steps$tab_main)) {
     proc_tab_main(project_dir, overwrite=overwrite)
   }
   
-  if (steps$ev_tab) {
+  if (isTRUE(steps$ev_tab)) {
     for (dt in doc_type) {
       repbox_ev_tab(project_dir, doc_type=dt)
     }
   }
-  if (steps$readme_overview) {
+  if (isTRUE(steps$readme_overview)) {
     proc_readme(project_dir,"readme_overview", overwrite=overwrite)
   }
-  if (steps$readme_var) {
+  if (isTRUE(steps$readme_var)) {
     proc_readme(project_dir,"readme_var", overwrite=overwrite)
   }
-  if (steps$readme_script_tab_fig) {
+  if (isTRUE(steps$readme_script_tab_fig)) {
     proc_readme(project_dir,"readme_script_tab_fig", overwrite=overwrite)
   }
-  if (steps$readme_data) {
+  if (isTRUE(steps$readme_data)) {
     proc_readme(project_dir,"readme_data", overwrite=overwrite)
   }
-  if (steps$readme_vs_guide) {
+  if (isTRUE(steps$readme_vs_guide)) {
     proc_readme(project_dir,"readme_vs_guide", overwrite=overwrite)
   }
 
-  if (steps$tab_classify) {
+  if (isTRUE(steps$tab_classify)) {
     for (dt in doc_type) {
       pru = 
         rai_pru_base(project_dir, "tab_classify",tpl_id = "tab_classify", doc_type=dt, overwrite=overwrite, to_v0 = to_v0) %>%
@@ -209,7 +220,7 @@ repbox_run_fp = function(project_dir, steps = repbox_fp_steps_from(TRUE), overwr
       proc_rai_pru(pru)
     }
   }
-  if (steps$by_tab_classify) {
+  if (iTRUE(steps$by_tab_classify)) {
     for (dt in doc_type) {
       pru = 
         rai_pru_base(project_dir, "tab_classify",tpl_id = "by_tab_classify", doc_type=dt, overwrite=overwrite, proc_postfix = "_bytab", to_v0 = to_v0) %>%
@@ -219,7 +230,7 @@ repbox_run_fp = function(project_dir, steps = repbox_fp_steps_from(TRUE), overwr
       proc_rai_pru(pru)
     }
   }
-  if (steps$by_tab_classify_nodoc) {
+  if (isTRUE(steps$by_tab_classify_nodoc)) {
     for (dt in doc_type) {
       pru = 
         rai_pru_base(project_dir, "tab_classify",tpl_id = "by_tab_classify_nodoc", proc_postfix = "_bytab_nodoc", doc_type=dt, overwrite=overwrite, to_v0 = to_v0) %>%
@@ -229,7 +240,7 @@ repbox_run_fp = function(project_dir, steps = repbox_fp_steps_from(TRUE), overwr
     }
   }
   dt = first(doc_type)
-  if (steps$map_reg_static) {
+  if (isTRUE(steps$map_reg_static)) {
     for (dt in doc_type) {
       pru = 
         rai_pru_base(project_dir, "map_reg_static", doc_type=dt, overwrite=overwrite, to_v0 = to_v0) %>%
@@ -240,9 +251,24 @@ repbox_run_fp = function(project_dir, steps = repbox_fp_steps_from(TRUE), overwr
       proc_rai_pru(pru)
     }
   }
-  if (steps$reg_classify_static) {
+  if (isTRUE(steps$reg_classify)) {
     for (dt in doc_type) {
-      cat("\nreg_classify_static for", dt, "of", project_dir, "\n")
+      cat("\nreg_classify for", dt, "of", project_dir, "\n")
+      pru = 
+        rai_pru_base(project_dir, "reg_classify", doc_type=dt, overwrite=overwrite, to_v0 = to_v0) %>%
+        rai_pru_add_doc() %>%
+        rai_pru_add_tab_df() %>%
+        # CHANGED: Use run-based map instead of static
+        rai_pru_add_reg_list(static=FALSE, filter_tab_df = TRUE) %>% 
+        rai_pru_add_tab_media(in_context=FALSE)
+      
+      proc_rai_pru(pru)
+    }
+  }
+  
+  if (isTRUE(steps$reg_classify_static)) {
+    for (dt in doc_type) {
+      cat("\nreg_classify for", dt, "of", project_dir, "\n")
       pru = 
         rai_pru_base(project_dir, "reg_classify_static", doc_type=dt, overwrite=overwrite, to_v0 = to_v0) %>%
         rai_pru_add_doc() %>%
@@ -253,7 +279,7 @@ repbox_run_fp = function(project_dir, steps = repbox_fp_steps_from(TRUE), overwr
       proc_rai_pru(pru)
     }
   }
-  if (steps$map_reg_run) {
+  if (isTRUE(steps$map_reg_run)) {
     for (dt in doc_type) {
       pru = 
         rai_pru_base(project_dir, "map_reg_run", doc_type=dt, overwrite=overwrite, to_v0 = to_v0) %>%
@@ -264,7 +290,7 @@ repbox_run_fp = function(project_dir, steps = repbox_fp_steps_from(TRUE), overwr
       proc_rai_pru(pru)
     }
   }
-  if (steps$map_inv_reg_run) {
+  if (isTRUE(steps$map_inv_reg_run)) {
     restore.point("proc_map_inv_reg_run")
     for (dt in doc_type) {
       pru = 

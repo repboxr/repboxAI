@@ -4,6 +4,7 @@ example = function(project_dir) {
   library(repboxRegmap)
   library(repboxReport)
   
+  options(warn=1)
   #restore.point.options(display.restore.point = TRUE)
   project_dir = "/home/rstudio/repbox/projects_gha_new/aejapp_10_4_6"
 
@@ -73,6 +74,7 @@ rai_patch_rerun = function(project_dir, prod_id="map_reg_run", patch_id = "patch
   
   # Create a patch process ID
   patch_proc_id = paste0(patch_id,"_", base_ver_id)
+  patch_proc_id = stri_replace_all_fixed(patch_proc_id, "--","__")
   
   # Initialize pru
   pru = rai_pru_base(project_dir, prod_id = prod_id, doc_type = doc_type, tpl_id = paste0(patch_id,"_",prod_id),overwrite = overwrite, to_v0 = to_v0,proc_id = patch_proc_id, ai_opts = ai_opts) %>%
@@ -189,10 +191,12 @@ rai_apply_patches = function(project_dir, prod_id, doc_type="art", key_col="tabi
     return(invisible())
   }
 
+  
   patch_proc_dir = patch_proc_dirs[1]
   # 2. Iterate through each patch and apply if necessary
   for (patch_proc_dir in patch_proc_dirs) {
     patch_proc_id = basename(patch_proc_dir)
+
     # Extract the base proc_id that this patch is for
     base_ver_id = stringi::stri_replace_first_fixed(patch_proc_id, paste0(patch_id,"_"), "")
     

@@ -80,7 +80,7 @@ repair_cell_id = function() {
   }
   
 
-  ver_dirs = fp_all_ver_dirs(project_dirs, "reg_classify_static")
+  ver_dirs = fp_all_ver_dirs(project_dirs, "reg_classify")
   ver_dir = ver_dirs[1]
   
   for (ver_dir in ver_dirs) {

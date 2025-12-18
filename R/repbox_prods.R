@@ -1,7 +1,7 @@
 example = function() {
   prods = repbox_prods()
   names(prods)
-  prod = repbox_prod("reg_classify_static")
+  prod = repbox_prod("reg_classify")
   prod = repbox_prod("map_reg_run")
   prod = repbox_prod("map_inv_reg_run")
   
@@ -67,25 +67,6 @@ repbox_tab_prods = function() {
     prod_define("tab_main",
       descr = "Article tables with html, title and notes",
       widens = c("tab_html","tab_notes")          
-    ),
-    prod_define("tab_classify",
-      list(
-        tabid = schema_str("The table id"),
-        tab_title = schema_str("The table title"),
-        panels = schema_str("Some tables exist of different panels shown above each other. If that is the case return a comma separated string with short panel IDs e.g. 'A,B,C' if it has a panel A, panel B and panel C. If no separate panels are marked just return null."),
-        num_panels = schema_int("The number of explicit panels in the table. If the table does not distinguish panels, write 0."),
-        shows_descriptive = schema_bool("true if the table shows descriptive statistics"),
-        is_balancing_table = schema_bool("true if the table is a balancing table that shows whether certain characteristics are similarily distributed between control and treatment groups."),
-        shows_regression = schema_bool("true if results of one or several regressions are shown in the table."),
-        shows_did = schema_bool("true if results of a difference-in-difference regression are shown in the table."),
-        shows_rdd = schema_bool("true if results of regression discontinuity design are shown in the table."),
-        shows_iv_results =  schema_bool("true if results of an instrumental variable regression are shown in the table"),
-        shows_iv_first_stage = schema_bool("true if results of a first stage instrumental variable regression are shown in the table."),
-        shows_placebo_test = schema_bool("true if results of a placebo test are shown in the table"),
-        num_regression = schema_int("The results of how many separate regressions are shown in the table?"),
-        uses_panel_data =  schema_bool("true if the data set underlying the table is a panel data set."),
-        short_descr =  schema_str("A short description of what is shown in the table.", allow_null = FALSE)
-      )
     ),
     prod_define(
       "cell_list",
@@ -302,7 +283,31 @@ repbox_map_prods = function() {
       figid = schema_str("If the regression is used to generate a particular figure in article or appendix, please note here the figure id. For example, if a figure is called 'Figure 5' the figid would be just '5', if a figure is called 'Fugure A.1' the figid would be 'A.1'.", allow_null = TRUE),
       cell_ids = schema_str("Relevant if the run regression can be mapped to particular table. A comma separated list of all cell ids of those cells in the HTML version of the table that correspond to the specific run regression. E.g. for a table with tabid='2', this comma separated string of cell ids might look like 'c2_10,c2-12,c2-14'. Each cell id can be found as the 'id' tag of the corresponding <td> or <th> element of the HTML version of the article's tables. Only add cells that show numeric results, e.g. estimated coefficient, or number of observations, but no title cells or cells showing variable labels. Some tables in articles are structured such that some descriptive statistics, like the number of observations are shown on the bottom of a column and apply to multiple regressions shown in that column. Add the corresponding cell id for every regression, that they apply to."),
       problem = schema_str("Did you encounter a problem related to this mapping? If yes describe it here. Typically this field will be empty. Only write something if there is an important problem that substantially hampers this mapping task.", allow_null = TRUE)
-    )),
+    ))
+  )
+}
+
+repbox_classify_prods = function() {
+  prods_define(
+    prod_define("tab_classify",
+      list(
+        tabid = schema_str("The table id"),
+        tab_title = schema_str("The table title"),
+        panels = schema_str("Some tables exist of different panels shown above each other. If that is the case return a comma separated string with short panel IDs e.g. 'A,B,C' if it has a panel A, panel B and panel C. If no separate panels are marked just return null."),
+        num_panels = schema_int("The number of explicit panels in the table. If the table does not distinguish panels, write 0."),
+        shows_descriptive = schema_bool("true if the table shows descriptive statistics"),
+        is_balancing_table = schema_bool("true if the table is a balancing table that shows whether certain characteristics are similarily distributed between control and treatment groups."),
+        shows_regression = schema_bool("true if results of one or several regressions are shown in the table."),
+        shows_did = schema_bool("true if results of a difference-in-difference regression are shown in the table."),
+        shows_rdd = schema_bool("true if results of regression discontinuity design are shown in the table."),
+        shows_iv_results =  schema_bool("true if results of an instrumental variable regression are shown in the table"),
+        shows_iv_first_stage = schema_bool("true if results of a first stage instrumental variable regression are shown in the table."),
+        shows_placebo_test = schema_bool("true if results of a placebo test are shown in the table"),
+        num_regression = schema_int("The results of how many separate regressions are shown in the table?"),
+        uses_panel_data =  schema_bool("true if the data set underlying the table is a panel data set."),
+        short_descr =  schema_str("A short description of what is shown in the table.", allow_null = FALSE)
+      )
+    ),
     prod_define("reg_classify_static", list(
       tabid = schema_str("The table ID as stated in the list of regressions above."),
       regid = schema_int("The regression ID as stated in the field 'regid' in the list of regressions shown above."),
@@ -321,10 +326,41 @@ repbox_map_prods = function() {
       cell_id_coef_of_interest = schema_str("Please state the cell ids of all cells for this regression that show the numeric value of the  coefficient of interests or their standard error / p-value / t-value. Return a comma separated list of all those cell_ids, like 'c2_10,c2-12'."),
       analyses_heterogeneity = schema_bool("true if the  cofficient of interest of the regressions analyze heterogenous effects, e.g. if the regression provided information on how treatment effect sizes differ between subgroups."),
       error_in_prompt_or_media = schema_str("Is there some inconsistency in the prompt or the attached media files, e.g. the media don't show the tables listed in the prompt etc. This could be an indicator for some error in my pipeline. If such an inconsistency exists, briefly describe it only for the first regression. If all seems ok, set to an empty string. In later regressions always set to an empty string.")
-      
-      
-    ))
+    )),
+    prod_define("reg_classify", list(
+      tabid = schema_str("The table ID as stated in the list of regressions above."),
+      regid = schema_int("The regression ID as stated in the field 'regid' in the list of regressions shown above."),
+      short_descr =  schema_str("A short description of what the regression analyzes based on the information in the article.", allow_null = FALSE),
+      is_did_reg = schema_bool("true if the regression performs a difference-in-difference (DID) analysis."),
+      is_rdd_reg = schema_bool("true if the regression performs a regression discontinuity design (RDD) analysis."),
+      is_iv_reg =  schema_bool("true if it is an instrumental varibale regression"),
+      is_iv_first_stage_reg = schema_bool("true if the shown regression results correspond to the first stage regression of an instrumental variable regression (in the script the command could be an iv regression with the option to show first stage results or it could be a separate OLS first stage regression)"),
+      is_placebo_test = schema_bool("true if the regression performs a placebo test, or a similar permutation test."),
+      is_pref_spec_in_tab = schema_bool("Often tables show multiple regression specifications and sometimes the authors state which specification is their preferred specification. Set true if this regression is the preferred specification  among the specifications shown in the table."),
+      is_main_result = schema_bool("true if the regression results are described as main results of the article (compared to robustness checks or additional results)"),
+      is_additional_result = schema_bool("true if the regression shows additional results that are not described as main results of the article"),
+      is_robustness_check = schema_bool("true if the regression is mainly a robustness check for other results."),
+      label_dep_var = schema_str("Based on the information in the article and table find a suitable label for the dependent variable in the regression."),
+      labels_coef_of_interest = schema_str("Often regression tables show both coefficients of primary interest for the analysis and coefficients for control variables that are not of primary interest. Sometimes only coefficient of primary interest are shown. Please state the variable lables of the coefficients of primary interest for this regression as shown in the table. If there are multiple variables of primary interest your string shall be a comma separted list, e.g. 'age,gender'."),
+      cell_id_coef_of_interest = schema_str("Please state the cell ids of all cells for this regression that show the numeric value of the  coefficient of interests or their standard error / p-value / t-value. Return a comma separated list of all those cell_ids, like 'c2_10,c2-12'."),
+      analyses_heterogeneity = schema_bool("true if the  cofficient of interest of the regressions analyze heterogenous effects, e.g. if the regression provided information on how treatment effect sizes differ between subgroups."),
+      map_label_to_var = schema_arr(
+        descr = "For the current regression only: map labels in the document (table/text/notes) for the dependent variable and for every explanatory variable shown in the table (and fixed effects / clustering vars if described) to the variable names used in the code and data.",
+        items = schema_obj(
+          properties = list(
+            label_in_doc = schema_str("The label of the variable as shown in the document: in the table or used in the text of the article."),
+            var_in_code = schema_str("The variable name as used in the code. If the regressor is an interaction effect between to variables, e.g. 'x' and 'z' use the notation 'x#z'."),
+            var_type = schema_str("A short characteriztion of the variable type: 'd' for dependented variable, 'x' for explanatory variable, 'fe' for a fixed effect, 'clu' for a variable that determines the cluster robust standard errors.")
+          )
+        )
+      ),
+      error_in_prompt_or_media = schema_str(
+        "Is there some inconsistency in the prompt or the attached media files, e.g. the media don't show the tables listed in the prompt etc. This could be an indicator for some error in my pipeline. If such an inconsistency exists, briefly describe it only for the first regression. If all seems ok return null. In other regressions than the first regressions, always set this field to null.",
+        allow_null = TRUE
+      )
+    ))  
   )
+
 }
 
 
@@ -340,7 +376,8 @@ repbox_other_prods = function() {
         risk_level  = schema_str("Severity of the breach: must be one of 'low', 'moderate', or 'high'.", enum=c("low","moderate","high"))
       )
     )
-  )  
+  )
+
 }
 
 

@@ -155,10 +155,6 @@ then the backported `tab_list` instance has `run_dir`:
 
 Extract a product using AI. E.g. `raix_tab_html_pdf` creates `tab_html` instances using AI. The `_pdf` indicates that the AI extracts the information directly from the PDF of the article. 
 
-#### hx_
-
-Extract a product using only heuristics. E.g. `hx_tab_html` creates `tab_html` instances using only heuristic approaches (the stuff that was developed shortly before the advent of AI in `repboxAI`). There are also a few helper functions with the `hx_` prefix related to heuristic product extraction. If extraction uses AI and heurisicts, we would typically use the `raix_` prefix.
-
 #### rai
 
 A `rai` (repbox AI) object stores informations related to a single AI call that will usually be part of an `raix_` extraction function.

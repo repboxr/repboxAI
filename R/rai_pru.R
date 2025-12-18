@@ -7,7 +7,7 @@ example = function() {
   
   project_dir = "~/repbox/projects_share/aeri_1_2_6"
   pru = 
-    rai_pru_base(project_dir, "reg_classify_static", doc_type="art", overwrite=TRUE) %>%
+    rai_pru_base(project_dir, "reg_classify", doc_type="art", overwrite=TRUE) %>%
     rai_pru_add_doc() %>%
     rai_pru_add_tab_df() %>%
     rai_pru_add_reg_list_static() %>%
@@ -134,6 +134,27 @@ rai_pru_add_tab_media = function(pru, tab_df = pru$tab_df, by_tab = FALSE, add_r
     
     
   }
+  pru
+}
+
+rai_pru_add_reg_list = function(pru, map_reg_pref = map_reg_run_default_pref(map_version), filter_tab_df = TRUE, static=TRUE, map_version = if (static) "map_reg_static" else "map_reg_run") {
+  if (is.null(pru)) return(pru)
+  pru = copy_into_list(dest=pru, exclude = "pru")
+  restore.point("rai_pru_add_reg_list")
+  
+  pru$map_ver_info = fp_pick_prod_ver(pru$fp_dir,map_version, pref = map_reg_pref)
+  
+  if (NROW(pru$map_ver_info)==0) {
+    cat("\nPlease first successfully create map_reg_run.\n")
+    return(NULL)
+  }
+  
+  pru$map_df = fp_load_prod_df(pru$map_ver_info$ver_dir)
+  if (filter_tab_df) {
+    if (is.null(pru$tab_df)) stop("Please make sure to first call rai_pru_add_tab_df.")
+    pru$tab_df = pru$tab_df[pru$tab_df$tabid %in% pru$map_df$tabid,]
+  }
+  pru$postfix = paste0("-", str.left.of(pru$map_ver_info$proc_id,"-"),pru$postfix)
   pru
 }
 
@@ -301,6 +322,10 @@ proc_rai_pru_run = function(pru) {
   if ("reg_run_list" %in% pru$tpl_var) {
     values = rai_prompt_value_reg_run_list(pru[["reg_df"]], values)
   }
+  if ("reg_list" %in% pru$tpl_var) {
+    values = rai_prompt_value_reg_list(pru$map_df, values, static=FALSE)
+  }
+
   if ("reg_list_static" %in% pru$tpl_var) {
     values = rai_prompt_value_reg_list_static(pru$map_df, values)
   }

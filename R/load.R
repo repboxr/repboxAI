@@ -69,6 +69,6 @@ rai_pick_ref_li_doc_dir = function(project_dir, doc_type="art", tab_ref_pref = t
 }
 
 
-rai_doc_file = function(project_dir, doc_type, pref = doc_file_form_default_pref(), doc_form=NULL) {
+rai_doc_file = function(project_dir, doc_type, pref = doc_file_form_default_pref(manual), doc_form=NULL, manual=FALSE) {
   repbox_doc_file_select(project_dir, doc_type = doc_type, doc_file_form_pref = pref, doc_form=doc_form)$doc_file
 }

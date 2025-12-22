@@ -9,13 +9,15 @@ repbox_default_fp_analysis = function(project_dir) {
     rstudioapi::filesPaneNavigate(project_dir)
   
   rgemini::set_gemini_api_key(file = "~/repbox/gemini/gemini_api_key.txt")
-  set_ai_opts(model = "gemini-3-pro-preview")
-  set_ai_opts(model = "gemini-2.5-flash")
+  set_ai_opts(model = "gemini-3-pro-preview", manual=TRUE)
+  #set_ai_opts(model = "gemini-2.5-flash")
+  #set_ai_opts(model = "gemini-flash-lite")
 
   steps = repbox_fp_steps(map_reg_run = TRUE)
   steps = repbox_fp_steps(reg_classify = TRUE)
-  repbox_run_fp(project_dir,steps, overwrite = FALSE)
-
+  repbox_run_fp(project_dir,steps, overwrite = TRUE)
+  repbox_rerun_outages(project_dir,steps = steps,max_repeat = 1, sleep_sec = 30)
+  
     
   steps_all = repbox_fp_steps_from(tab_given=TRUE)
   steps_hx = repbox_fp_steps(tab_given=TRUE)
@@ -220,7 +222,7 @@ repbox_run_fp = function(project_dir, steps = repbox_fp_steps_from(TRUE), overwr
       proc_rai_pru(pru)
     }
   }
-  if (iTRUE(steps$by_tab_classify)) {
+  if (isTRUE(steps$by_tab_classify)) {
     for (dt in doc_type) {
       pru = 
         rai_pru_base(project_dir, "tab_classify",tpl_id = "by_tab_classify", doc_type=dt, overwrite=overwrite, proc_postfix = "_bytab", to_v0 = to_v0) %>%
@@ -256,11 +258,11 @@ repbox_run_fp = function(project_dir, steps = repbox_fp_steps_from(TRUE), overwr
       cat("\nreg_classify for", dt, "of", project_dir, "\n")
       pru = 
         rai_pru_base(project_dir, "reg_classify", doc_type=dt, overwrite=overwrite, to_v0 = to_v0) %>%
+        rai_pru_add_static_do() %>%
         rai_pru_add_doc() %>%
         rai_pru_add_tab_df() %>%
-        # CHANGED: Use run-based map instead of static
         rai_pru_add_reg_list(static=FALSE, filter_tab_df = TRUE) %>% 
-        rai_pru_add_tab_media(in_context=FALSE)
+        rai_pru_add_tab_media(in_context=FALSE) 
       
       proc_rai_pru(pru)
     }

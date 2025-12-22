@@ -1,3 +1,4 @@
+DESCRIPTION
 R/data_to_prompt.R
 R/dirs.R
 R/ev_map.R
@@ -26,4 +27,4 @@ R/td_background.R
 R/temp_source.R
 R/test_cell.R
 R/tools.R
-pipeline.md
+README.md

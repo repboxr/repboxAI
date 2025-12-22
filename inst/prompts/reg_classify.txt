@@ -8,16 +8,20 @@ LIST OF CONSIDERED TABLES
 
 Attached is an HTML file that contains an HTML representation of all tables in {{cur_doc}} each of those tables, with each <td> and <th> cell identified with a unique cell id. 
 
-Also a attached is a txt file that contains the line numbered source code of the following script files that are part of the article's reproduction package
-A previous analysis identified the separate regressions shown in the table. The following list shows all those identified regressions.
+Also a attached is a txt file that contains the line numbered Stata source code of the that are part of the article's reproduction package. For regression commands also the regression output is shown.
+
+
+A previous analysis identified the separate regressions. The following JSON array shows all those identified regressions. Each regression has a unique ID given by the field regid.
 
 LIST OF IDENTIFIED REGRESSIONS
 
 {{reg_list}}
 
-Your task is the following: Go through every regression in the list of identified regression and characterize it according to the JSON response schema shown below. Every regression in the list above should have one entry in the generated JSON array.
+Your task is the following: Go through every regression in the JSON array above and characterize it according to the JSON response schema shown below.
 
-If for some field, you don't know the answer given the provided information, please set the field value to null.
+Every regression in the list above should have one entry in the generated JSON array with the same regid.
+
+If for some field in the response schema, you don't know the answer given the provided information, please set the field value to null.
 
 JSON RESPONSE SCHEMA:
 {
@@ -37,78 +41,155 @@ JSON RESPONSE SCHEMA:
         "type": "string",
         "description": "A short description of what the regression analyzes based on the information in the article."
       },
-      "is_did_reg": {
-        "type": ["bool", "null"],
-        "description": "true if the regression performs a difference-in-difference (DID) analysis."
+      "regression_tags": {
+        "type": "string",
+        "pattern": "^([a-z0-9_]+)(,[a-z0-9_]+)*$",
+        "description": "A string describing a comma separated list containing each of the following tags that apply to the regression, e.g. \"main_result,causal_effect,DID,panel_data\".
+Here is the list description of all tags that could apply to the the current regression. Check for every tag, whether it applies and if yes, add it to the comma separated list.
+
+- main_result: a main result of the paper
+- is_preferred_spec: the article suggests that this regression is the preferred specification in the table
+- robustness: a robustness check
+- causal_effect: estimates a causal effect
+- heterogeneous_effect: analysises a heterogeneous effect 
+- did: difference in difference analysis (including specializations like tripple diff)
+- ddd: a tripple diff DID analysis
+- did_staggered: a DID analysis with staggered treatment adoption
+- did_continuous: a DID analysis with a continuous variable for the treatment effect instead of dummies
+- event_study: the article refers to the regression as an event study
+- iv: instrumental variables regression
+- iv_first_stage: the regression is the first stage of an IV regression
+- rdd: regresion discontinuity design
+- rct: analysis data from a randomized controlled trial
+- lab_experiment: analyses data from a laboratory experiment
+- field_experiment: analyses data from a field experiment
+- panel_data: analyses a panel data set
+- time_series: analyses pure time series data
+- cross_section: analyses pure cross section data
+- balance_test: a balance test in a balance table
+- placebo_test: a placebo test
+- permutation_test: a permutation test
+- has_fixed_effects: regression uses fixed effects
       },
-      "is_rdd_reg": {
-        "type": ["bool", "null"],
-        "description": "true if the regression performs a regression discontinuity design (RDD) analysis."
-      },
-      "is_iv_reg": {
-        "type": ["bool", "null"],
-        "description": "true if it is an instrumental varibale regression"
-      },
-      "is_iv_first_stage_reg": {
-        "type": ["bool", "null"],
-        "description": "true if the shown regression results correspond to the first stage regression of an instrumental variable regression (in the script the command could be an iv regression with the option to show first stage results or it could be a separate OLS first stage regression)"
-      },
-      "is_placebo_test": {
-        "type": ["bool", "null"],
-        "description": "true if the regression performs a placebo test, or a similar permutation test."
-      },
-      "is_pref_spec_in_tab": {
-        "type": ["bool", "null"],
-        "description": "Often tables show multiple regression specifications and sometimes the authors state which specification is their preferred specification. Set true if this regression is the preferred specification  among the specifications shown in the table."
-      },
-      "is_main_result": {
-        "type": ["bool", "null"],
-        "description": "true if the regression results are described as main results of the article (compared to robustness checks or additional results)"
-      },
-      "is_additional_result": {
-        "type": ["bool", "null"],
-        "description": "true if the regression shows additional results that are not described as main results of the article"
-      },
-      "is_robustness_check": {
-        "type": ["bool", "null"],
-        "description": "true if the regression is mainly a robustness check for other results."
-      },
-      "label_dep_var": {
-        "type": ["string", "null"],
-        "description": "Based on the information in the article and table find a suitable label for the dependent variable in the regression."
-      },
-      "labels_coef_of_interest": {
-        "type": ["string", "null"],
-        "description": "Often regression tables show both coefficients of primary interest for the analysis and coefficients for control variables that are not of primary interest. Sometimes only coefficient of primary interest are shown. Please state the variable lables of the coefficients of primary interest for this regression as shown in the table. If there are multiple variables of primary interest your string shall be a comma separted list, e.g. 'age,gender'."
-      },
-      "cell_id_coef_of_interest": {
-        "type": ["string", "null"],
-        "description": "Please state the cell ids of all cells for this regression that show the numeric value of the  coefficient of interests or their standard error / p-value / t-value. Return a comma separated list of all those cell_ids, like 'c2_10,c2_12'."
-      },
-      "analyses_heterogeneity": {
-        "type": ["bool", "null"],
-        "description": "true if the  cofficient of interest of the regressions analyze heterogenous effects, e.g. if the regression provided information on how treatment effect sizes differ between subgroups."
-      },
-      "map_label_to_var": {
+      "vars": {
         "type": "array",
-        "description": "The labels for dependent or explanatory variables shown used in the article or appendix usually differs from the corresponding variable name in the data set and Stata code. In this array you are asked to map for the current regression only, the dependent variable and for every explanatory variable that is shown in the table the label from the article / appendix to the variable name in the data set and used in the Stata code. Explanatory variables that have no label or description in the table for this regression can be ignored. Variables for fixed effects or clusters are often only described in the table notes. For them also provide a mapping here.",
+        "description": "An array of all variables important for this regression, like dependent variable, explanatory variable whose causal effect is estimated, control variables shown in the paper, cluster variable for standard errors. You don't need to add control variables 'x_co' that are not shown in the table, but please try to add all fixed effect variables.",
         "items": {
           "type": "object",
           "properties": {
-            "label_in_doc": {
+            "label_in_article": {
               "type": "string",
-              "description": "The label of the variable as shown in the document: in the table or used in the text of the article."
+              "description": "The label of the variable as shown in the article: either in the table directly or used in the text of the article."
             },
             "var_in_code": {
               "type": "string",
-              "description": "The variable name as used in the code. If the regressor is an interaction effect between to variables, e.g. 'x' and 'z' use the notation 'x#z'."
+              "description": "The variable name as used in the Stata code. If the regressor is an interaction effect between to variables, e.g. 'x' and 'z' use the notation 'x#z'. Sometimes fixed effects are implemented by many dummy variables like region1, region2, region3 etc. Use a short glob like 'region*' to describe such dummy sets."
             },
             "var_type": {
               "type": "string",
-              "description": "A short characteriztion of the variable type: 'd' for dependented variable, 'x' for explanatory variable, 'fe' for a fixed effect, 'clu' for a variable that determines the cluster robust standard errors."
+              "description": "A short characteriztion of the variable type: 'd' for dependented variable, 'x_eff' for an explanatory variable whose causal effect shall be estimated, 'x_co' an explanatory variable that is a control variable, 'fe' for a fixed effect, 'clu' for a variable that determines the cluster robust standard errors,'weight' a regression weight,  'instrument' an excluded instrument",
+              "enum": ["d","x_eff","x_co","fe","clu","weight","instrument"]
+            },
+            "cell_id_estimate": {
+              "type": ["string", "null"],
+              "description": "For explanatory variables whose coefficient estimate is shown in the table, please write down the cell_id in which the coefficient estimate is shown."
+            },
+            "unit": {
+              "type": "string",
+              "description": "If the article, README or code provides some information about the unit of the variable, please state the unit here. Otherwise leave the field empty. If the variable is in logs just write log. If it is a growth_rate just write growth_rate. If it is a difference in some known unit write diff_unit where you replace unit. If it is a difference but you don't know the unit, just write diff."
             }
           }
         }
+      },
+      "dimensions_same_as_regid": {
+        "type": "string",
+        "description": "If the dimensions described below are the same as in an earler regression where you have already described the dimensions, you can just state the regid of that earlier regression here and don't describe the dimensions again in order to save space. Only enter one regid. If at least in some aspect the dimensions are different from all previous regressions, leave this field empty and fully specify the dimesions field below.",      
+      },
+      "dimensions": {
+        "type": "array",
+        "description": "We also would like to know the variables that describe the dimensions of the data set to understand the units of analysis. E.g. in a macroeconomic panel data set the dimensions might be described by variables 'country' and 'year'. If you have filled 'dimensions_same_as_regid' you can leave this array empty.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "dim_class": {
+              "type": "string",
+              "description": "The broad class of the dimension, time is any time dimension, region can be a country, city etc, person could be an individual or a group, entity could be a firm, institution etc, an attribute could be be a sector for a firm, an income group for a person, a cohort etc, ",
+              "enum": ["time","region","person","entity","attribute", "other"]
+            },
+            "dim_type": {
+              "type": "string",
+              "description": "Finer type of the dimension",
+              "enum": ["year", "datetime", "time", "day", "cohort","period_experiment",
+    "season", "season_weekday","season_month",
+    "country", "city","state","province","county","village","region",
+    "individual", "group", "firm", "facility","bank",
+    "station",
+    "sector","sector_sic2","sector_sic3","sector_sic4",
+    "fund", "asset",
+    "other", "unknown","constant",
+    "wave", "strata","session",
+    "household",
+    "patent_class"]
+            },
+            "other_dim_type": {
+              "type": "string",
+              "description": "If you have chosen dim_type 'other' above you can enter here a short label for the dimension type that best fits the dimension. Otherwise leave empty."
+            },
+            "var_in_code": {
+              "type": "string",
+              "description": "A variable name as used in the Stata code that describes this dimenion. If only described by a dummy variable set, leave empty."
+            },
+            "dummy_set": {
+              type: "string",
+              "description": "Some dimensions are described by a dummy variable set, like region1, region2, region3 etc. If that is the case use a short glob like 'region*' to describe it. Otherwise leave this field empty."
+            },
+            "unit": {
+              "type": "string",
+              "description": "If the article, README or code provides some information about the unit of the variable, please state the unit here. Otherwise leave the field empty."
+            }
+          }
+        }
+      },
+      "reported_stats": {
+        "type": "array",
+        "description": "Beyond coefficient estimates and standard errors or p-values for certain coefficients, regression tables often report a subset of general regression statistics, like number of observations, R-squared etc. They shall be reported here.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "stat_label": {
+              "type": "string",
+              "description": "A general label for the regression stat. For the stats below use the specified label. For other stats choose your own suitable label.
+
+- num_obs: number of observations
+- num_clu: number of clusters
+- r_squared: R suqared
+- adj_r_squared: adjusted R squared
+              "
+            },
+            "value_table": {
+              "type":  ["numeric","null"],
+              "description": "The numeric value of the statistic as shown in the table."
+            },
+            "cell_id": {
+              "type":  ["string"],
+              "description": "The cell_id in which the numeric value of the statistic is shown in the table"
+            },
+            "value_code": {
+              "type": ["numeric","null"],
+              "description": "The numeric value of the statistic as computed by the Stata code, if available."
+            }
+          }
+        }
+      },
+      "standard_error_type": {
+        "type": "string",
+        "description": "Does the article or table provide any information about the type of standard error? We can of course infer it from the Stata code, but here we just ask what is reported in the table / article. Pick one of the types below or a new type if the actual type is not listed.
+
+- cluster_robust
+- robust
+- IID
+- unknown
+"
       },
       "error_in_prompt_or_media": {
         "type": ["string", "null"],

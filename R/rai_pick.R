@@ -1,13 +1,19 @@
 
-doc_file_form_default_pref = function() {
-  c("html","pdf","mocr_md", "pdf_txt")
+doc_file_form_default_pref = function(manual=FALSE) {
+  if (!manual) {
+    c("html","pdf","mocr_md", "pdf_txt")
+  } else {
+    c("mocr_md", "pdf_txt","html")
+  }
 }
 
 tab_df_default_pref = function(prod_id = "tab_main") {
   rai_prefs(c("mocr", "html","pdf-g*","pdf_txt"), prio_mocr=FALSE)
 }
 
-map_reg_default_pref = function(map_version=NULL) {
+
+
+map_reg_default_pref = map_reg_run_default_pref = map_reg_static_default_pref = function(map_version=NULL) {
   rai_prefs()
 }
 

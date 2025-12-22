@@ -19,9 +19,10 @@ example = function() {
 }  
 
 
-rai_pru_base = function(project_dir, prod_id, doc_type="art", ai_opts = get_ai_opts(), verbose=TRUE, to_v0=TRUE, tpl_id = paste0(prod_id), json_mode=TRUE, use_schema = FALSE, overwrite=FALSE, tpl_dir = rai_tpl_dir(), tpl_file = NULL, proc_prefix = "", proc_postfix="", proc_id=NULL, parcels=list()) {
+rai_pru_base = function(project_dir, prod_id, doc_type="art", ai_opts = get_ai_opts(), verbose=TRUE, to_v0=TRUE, tpl_id = paste0(prod_id), json_mode=TRUE, use_schema = FALSE, overwrite=FALSE, tpl_dir = rai_tpl_dir(), tpl_file = NULL, proc_prefix = "", proc_postfix="", proc_id=NULL, parcels=list(), manual = isTRUE(ai_opts$manual)) {
   fp_dir = file.path(project_dir, "fp", paste0("prod_",doc_type))
   prefix = postfix = ""
+  if (manual) prefix = "man_"
   pru = copy_into_list()
   restore.point("rai_pru_base")
   
@@ -31,7 +32,7 @@ rai_pru_base = function(project_dir, prod_id, doc_type="art", ai_opts = get_ai_o
   return(pru)
 }  
 
-rai_pru_add_doc = function(pru, add_all_doc=TRUE, doc_file_form_pref = doc_file_form_default_pref(), in_context=TRUE) {
+rai_pru_add_doc = function(pru, add_all_doc=TRUE, doc_file_form_pref = doc_file_form_default_pref(manual), in_context=TRUE, manual=isTRUE(pru$manual)) {
   if (is.null(pru)) return(pru)
   pru = copy_into_list(dest=pru, exclude = "pru")
   restore.point("rai_pru_add_doc")
@@ -306,6 +307,8 @@ proc_rai_pru_run = function(pru) {
   }
   
   project_dir = pru$project_dir
+  manual = isTRUE(pru$manual)
+
   
   if (length(pru$content_media_files)>0) {
     pru$context = rai_context(pru$project_dir,model = pru$ai_opts$model,media_files = pru$context_media_files)
@@ -374,13 +377,34 @@ proc_rai_pru_run = function(pru) {
         }
         rai$media_files = media_files
       }
-      
-      res = ai_run(rai, values=values)
+      if (manual) {
+        # Generate the full prompt text and save it
+        rai_pru_export_manual_prompt(pru, rai, values, row = if(num_items > 1) row else NULL)
+        return(list(success = TRUE, manual = TRUE))
+      } else {
+        res = ai_run(rai, values=values)
+        return(res)
+      }
     })
   } else {
-    res = ai_run(rai, values=values)
-    pru$items = list(res)
+    if (manual) {
+      rai_pru_export_manual_prompt(pru, rai, values)
+      pru$items = list(list(success = TRUE, manual = TRUE))
+    } else {
+      res = ai_run(rai, values=values)
+      pru$items = list(res)
+    }
   }
+  
+  if (manual) {
+    cat("\nManual prompt(s) exported to: ", pru$ver_dir)
+    cat("\nPaste the response into ai_resp.md in that directory and call rai_pru_process_manual().\n")
+    # Save the PRU in an "incomplete" state
+    temp_pru_save(pru);
+    return(invisible(pru))
+  }
+
+  
   pru = pru_set_status(pru, pru$items)
   
   restore.point("proc_rai_run_post")
@@ -394,5 +418,7 @@ proc_rai_pru_run = function(pru) {
   prod_df = df_to_prod_df(res_df, repbox_prod(pru$prod_id))
   pru_save(pru, prod_df)
   writeLines(pru$items[[1]]$prompt, file.path(pru$ver_dir,"prompt.txt"))
+  if (FALSE)
+    rstudioapi::filesPaneNavigate(pru$ver_dir)
   return(invisible(pru))
 }

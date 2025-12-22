@@ -33,6 +33,7 @@ repbox_prods = function() {
     repbox_tab_prods(),
     repbox_readme_prods(),
     repbox_map_prods(),
+    repbox_classify_prods(),
     repbox_other_prods()
   )
 }
@@ -327,38 +328,188 @@ repbox_classify_prods = function() {
       analyses_heterogeneity = schema_bool("true if the  cofficient of interest of the regressions analyze heterogenous effects, e.g. if the regression provided information on how treatment effect sizes differ between subgroups."),
       error_in_prompt_or_media = schema_str("Is there some inconsistency in the prompt or the attached media files, e.g. the media don't show the tables listed in the prompt etc. This could be an indicator for some error in my pipeline. If such an inconsistency exists, briefly describe it only for the first regression. If all seems ok, set to an empty string. In later regressions always set to an empty string.")
     )),
-    prod_define("reg_classify", list(
-      tabid = schema_str("The table ID as stated in the list of regressions above."),
-      regid = schema_int("The regression ID as stated in the field 'regid' in the list of regressions shown above."),
-      short_descr =  schema_str("A short description of what the regression analyzes based on the information in the article.", allow_null = FALSE),
-      is_did_reg = schema_bool("true if the regression performs a difference-in-difference (DID) analysis."),
-      is_rdd_reg = schema_bool("true if the regression performs a regression discontinuity design (RDD) analysis."),
-      is_iv_reg =  schema_bool("true if it is an instrumental varibale regression"),
-      is_iv_first_stage_reg = schema_bool("true if the shown regression results correspond to the first stage regression of an instrumental variable regression (in the script the command could be an iv regression with the option to show first stage results or it could be a separate OLS first stage regression)"),
-      is_placebo_test = schema_bool("true if the regression performs a placebo test, or a similar permutation test."),
-      is_pref_spec_in_tab = schema_bool("Often tables show multiple regression specifications and sometimes the authors state which specification is their preferred specification. Set true if this regression is the preferred specification  among the specifications shown in the table."),
-      is_main_result = schema_bool("true if the regression results are described as main results of the article (compared to robustness checks or additional results)"),
-      is_additional_result = schema_bool("true if the regression shows additional results that are not described as main results of the article"),
-      is_robustness_check = schema_bool("true if the regression is mainly a robustness check for other results."),
-      label_dep_var = schema_str("Based on the information in the article and table find a suitable label for the dependent variable in the regression."),
-      labels_coef_of_interest = schema_str("Often regression tables show both coefficients of primary interest for the analysis and coefficients for control variables that are not of primary interest. Sometimes only coefficient of primary interest are shown. Please state the variable lables of the coefficients of primary interest for this regression as shown in the table. If there are multiple variables of primary interest your string shall be a comma separted list, e.g. 'age,gender'."),
-      cell_id_coef_of_interest = schema_str("Please state the cell ids of all cells for this regression that show the numeric value of the  coefficient of interests or their standard error / p-value / t-value. Return a comma separated list of all those cell_ids, like 'c2_10,c2-12'."),
-      analyses_heterogeneity = schema_bool("true if the  cofficient of interest of the regressions analyze heterogenous effects, e.g. if the regression provided information on how treatment effect sizes differ between subgroups."),
-      map_label_to_var = schema_arr(
-        descr = "For the current regression only: map labels in the document (table/text/notes) for the dependent variable and for every explanatory variable shown in the table (and fixed effects / clustering vars if described) to the variable names used in the code and data.",
-        items = schema_obj(
-          properties = list(
-            label_in_doc = schema_str("The label of the variable as shown in the document: in the table or used in the text of the article."),
-            var_in_code = schema_str("The variable name as used in the code. If the regressor is an interaction effect between to variables, e.g. 'x' and 'z' use the notation 'x#z'."),
-            var_type = schema_str("A short characteriztion of the variable type: 'd' for dependented variable, 'x' for explanatory variable, 'fe' for a fixed effect, 'clu' for a variable that determines the cluster robust standard errors.")
+  prod_define("reg_classify", list(
+        tabid = schema_str("The table ID as stated in the list of regressions above."),
+        regid = schema_str("The regression ID as stated in the field 'regid' in the list of regressions shown above."),
+        short_descr = schema_str(
+          "A short description of what the regression analyzes based on the information in the article.",
+          allow_null = FALSE
+        ),
+        regression_tags = schema_str(
+          paste0(
+            "A string describing a comma separated list containing each of the following tags that apply to the regression, ",
+            "e.g. \"main_result,causal_effect,did,panel_data\".\n",
+            "Check for every tag whether it applies and if yes add it to the comma separated list.\n\n",
+            "- main_result: a main result of the paper\n",
+            "- is_preferred_spec: the article suggests that this regression is the preferred specification in the table\n",
+            "- robustness: a robustness check\n",
+            "- causal_effect: estimates a causal effect\n",
+            "- heterogeneous_effect: analysises a heterogeneous effect\n",
+            "- did: difference in difference analysis (including specializations like tripple diff)\n",
+            "- ddd: a tripple diff DID analysis\n",
+            "- did_staggered: a DID analysis with staggered treatment adoption\n",
+            "- did_continuous: a DID analysis with a continuous variable for the treatment effect instead of dummies\n",
+            "- event_study: the article refers to the regression as an event study\n",
+            "- iv: instrumental variables regression\n",
+            "- iv_first_stage: the regression is the first stage of an IV regression\n",
+            "- rdd: regresion discontinuity design\n",
+            "- rct: analysis data from a randomized controlled trial\n",
+            "- lab_experiment: analyses data from a laboratory experiment\n",
+            "- field_experiment: analyses data from a field experiment\n",
+            "- panel_data: analyses a panel data set\n",
+            "- time_series: analyses pure time series data\n",
+            "- cross_section: analyses pure cross section data\n",
+            "- balance_test: a balance test in a balance table\n",
+            "- placebo_test: a placebo test\n",
+            "- permutation_test: a permutation test\n",
+            "- has_fixed_effects: regression uses fixed effects"
+          ),
+          pattern = "^([a-z0-9_]+)(,[a-z0-9_]+)*$"
+        ),
+        vars = schema_arr(
+          descr = paste0(
+            "An array of all variables important for this regression, like dependent variable, explanatory variable whose causal effect is estimated, ",
+            "control variables shown in the paper, cluster variable for standard errors. You don't need to add control variables 'x_co' that are not shown ",
+            "in the table, but please try to add all fixed effect variables."
+          ),
+          items = schema_obj(
+            properties = list(
+              label_in_article = schema_str(
+                "The label of the variable as shown in the article: either in the table directly or used in the text of the article."
+              ),
+              var_in_code = schema_str(
+                paste0(
+                  "The variable name as used in the Stata code. If the regressor is an interaction effect between to variables, e.g. 'x' and 'z' ",
+                  "use the notation 'x#z'. Sometimes fixed effects are implemented by many dummy variables like region1, region2, region3 etc. ",
+                  "Use a short glob like 'region*' to describe such dummy sets."
+                )
+              ),
+              var_type = schema_str(
+                paste0(
+                  "A short characteriztion of the variable type: ",
+                  "'d' for dependented variable, ",
+                  "'x_eff' for an explanatory variable whose causal effect shall be estimated, ",
+                  "'x_co' an explanatory variable that is a control variable, ",
+                  "'fe' for a fixed effect, ",
+                  "'clu' for a variable that determines the cluster robust standard errors, ",
+                  "'weight' a regression weight, ",
+                  "'instrument' an excluded instrument"
+                ),
+                enum = c("d", "x_eff", "x_co", "fe", "clu", "weight", "instrument")
+              ),
+              cell_id_estimate = schema_str(
+                "For explanatory variables whose coefficient estimate is shown in the table, please write down the cell_id in which the coefficient estimate is shown.",
+                allow_null = TRUE
+              ),
+              unit = schema_str(
+                paste0(
+                  "If the article, README or code provides some information about the unit of the variable, please state the unit here. Otherwise leave the field empty. ",
+                  "If the variable is in logs just write log. If it is a growth_rate just write growth_rate. If it is a difference in some known unit write diff_unit ",
+                  "where you replace unit. If it is a difference but you don't know the unit, just write diff."
+                )
+              )
+            )
           )
+        ),
+        dimensions_same_as_regid = schema_str(
+          paste0(
+            "If the dimensions described below are the same as in an earler regression where you have already described the dimensions, ",
+            "you can just state the regid of that earlier regression here and don't describe the dimensions again in order to save space. Only enter one regid. ",
+            "If at least in some aspect the dimensions are different from all previous regressions, leave this field empty and fully specify the dimesions field below."
+          )
+        ),
+        dimensions = schema_arr(
+          descr = paste0(
+            "We also would like to know the variables that describe the dimensions of the data set to understand the units of analysis. ",
+            "E.g. in a macroeconomic panel data set the dimensions might be described by variables 'country' and 'year'. ",
+            "If you have filled 'dimensions_same_as_regid' you can leave this array empty."
+          ),
+          items = schema_obj(
+            properties = list(
+              dim_class = schema_str(
+                paste0(
+                  "The broad class of the dimension, time is any time dimension, region can be a country, city etc, person could be an individual or a group, ",
+                  "entity could be a firm, institution etc, an attribute could be be a sector for a firm, an income group for a person, a cohort etc,"
+                ),
+                enum = c("time", "region", "person", "entity", "attribute", "other")
+              ),
+              dim_type = schema_str(
+                "Finer type of the dimension",
+                enum = c(
+                  "year", "datetime", "time", "day", "cohort", "period_experiment",
+                  "season", "season_weekday", "season_month",
+                  "country", "city", "state", "province", "county", "village", "region",
+                  "individual", "group", "firm", "facility", "bank",
+                  "station",
+                  "sector", "sector_sic2", "sector_sic3", "sector_sic4",
+                  "fund", "asset",
+                  "other", "unknown", "constant",
+                  "wave", "strata", "session",
+                  "household",
+                  "patent_class"
+                )
+              ),
+              other_dim_type = schema_str(
+                "If you have chosen dim_type 'other' above you can enter here a short label for the dimension type that best fits the dimension. Otherwise leave empty."
+              ),
+              var_in_code = schema_str(
+                "A variable name as used in the Stata code that describes this dimenion. If only described by a dummy variable set, leave empty."
+              ),
+              dummy_set = schema_str(
+                "Some dimensions are described by a dummy variable set, like region1, region2, region3 etc. If that is the case use a short glob like 'region*' to describe it. Otherwise leave this field empty."
+              ),
+              unit = schema_str(
+                "If the article, README or code provides some information about the unit of the variable, please state the unit here. Otherwise leave the field empty."
+              )
+            )
+          )
+        ),
+        reported_stats = schema_arr(
+          descr = paste0(
+            "Beyond coefficient estimates and standard errors or p-values for certain coefficients, regression tables often report a subset of general regression statistics, ",
+            "like number of observations, R-squared etc. They shall be reported here."
+          ),
+          items = schema_obj(
+            properties = list(
+              stat_label = schema_str(
+                paste0(
+                  "A general label for the regression stat. For the stats below use the specified label. For other stats choose your own suitable label.\n\n",
+                  "- num_obs: number of observations\n",
+                  "- num_clu: number of clusters\n",
+                  "- r_squared: R squared\n",
+                  "- adj_r_squared: adjusted R squared"
+                )
+              ),
+              value_table = schema_num(
+                "The numeric value of the statistic as shown in the table.",
+                allow_null = TRUE
+              ),
+              cell_id = schema_str(
+                "The cell_id in which the numeric value of the statistic is shown in the table."
+              ),
+              value_code = schema_num(
+                "The numeric value of the statistic as computed by the Stata code, if available.",
+                allow_null = TRUE
+              )
+            )
+          )
+        ),
+        standard_error_type = schema_str(
+          paste0(
+            "Does the article or table provide any information about the type of standard error? ",
+            "Pick one of the types below or a new type if the actual type is not listed.\n\n",
+            "- cluster_robust\n",
+            "- robust\n",
+            "- IID\n",
+            "- unknown"
+          )
+        ),
+        error_in_prompt_or_media = schema_str(
+          "Is there some inconsistency in the prompt or the attached media files, e.g. the media don't show the tables listed in the prompt etc. This could be an indicator for some error in my pipeline. If such an inconsistency exists, briefly describe it only for the first regression. If all seems ok return null. In other regressions than the first regression, always set this field to null.",
+          allow_null = TRUE
         )
-      ),
-      error_in_prompt_or_media = schema_str(
-        "Is there some inconsistency in the prompt or the attached media files, e.g. the media don't show the tables listed in the prompt etc. This could be an indicator for some error in my pipeline. If such an inconsistency exists, briefly describe it only for the first regression. If all seems ok return null. In other regressions than the first regressions, always set this field to null.",
-        allow_null = TRUE
       )
-    ))  
+    )
   )
 
 }
@@ -385,4 +536,8 @@ schema_html_tab = function(...) {
   x = schema_str(...)
   class(x) = union(c("schema_html_tab", "schema_html"), class(x))
   x
+}
+
+json_schema_to_prod_code = function() {
+  
 }

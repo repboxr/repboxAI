@@ -21,23 +21,26 @@ rai_prompt_value_reg_list_static = function(map_df, values=list()) {
   # Transform map_df to reg_df
   map_df = rename.cols(map_df, "do_file","script_file")
   reg_df = map_df %>%
-    group_by(tabid, regid) %>%
+    group_by(regid, tabid) %>%
     summarize(
       cell_ids = merge_unique_comma_str(cell_ids),
       script_files = merge_unique_comma_str(script_file),
       code_lines = merge_unique_comma_str(code_line)
     ) %>%
     ungroup()
-  values$reg_list_static = text_table(reg_df)
+  #values$reg_list_static = text_table(reg_df)
+  values$reg_list = jsonlite::toJSON(reg_df,dataframe="rows", auto_unbox = TRUE)
+
   values
 }
 
 rai_prompt_value_reg_list = function(map_df, values=list(), static=FALSE) {
   # Transform map_df to reg_df
   if (static) return(rai_prompt_value_reg_list_static(map_df, values))
+  restore.point("rai_prompt_value_reg_list")
   map_df = rename.cols(map_df, "do_file","script_file")
   reg_df = map_df %>%
-    group_by(tabid, regid) %>%
+    group_by(regid, tabid) %>%
     summarize(
       cell_ids = merge_unique_comma_str(cell_ids),
       script_files = merge_unique_comma_str(script_file),
@@ -45,7 +48,8 @@ rai_prompt_value_reg_list = function(map_df, values=list(), static=FALSE) {
       run_ids = merge_unique_comma_str(runid)
     ) %>%
     ungroup()
-  values$reg_list = text_table(reg_df)
+  #values$reg_list = text_table(reg_df)
+  values$reg_list = jsonlite::toJSON(reg_df,dataframe="rows", auto_unbox = TRUE)
   values
 }
 

@@ -167,7 +167,7 @@ repbox_fp_steps_from = function(tab_given=FALSE, tab_notes_pdf=tab_given, tab_ht
   as.list(sys.frame(sys.parent(0)))
 }
 
-repbox_run_fp = function(project_dir, steps = repbox_fp_steps_from(TRUE), overwrite=FALSE, overwrite_hx = overwrite, doc_type = NULL, to_v0 = TRUE) {
+repbox_run_fp = function(project_dir, steps = repbox_fp_steps_from(TRUE), overwrite=FALSE, overwrite_hx = overwrite, doc_type = NULL, doc_form = NULL, to_v0 = TRUE) {
   restore.point("repbox_run_fp")
   org_steps = steps
   steps = repbox_fp_join_steps(steps)
@@ -178,7 +178,7 @@ repbox_run_fp = function(project_dir, steps = repbox_fp_steps_from(TRUE), overwr
     doc_type = all_doc_types
   }
   if (isTRUE(steps$tab_given)) {
-    proc_tab_given(project_dir, doc_type=doc_type)
+    proc_tab_given(project_dir, doc_type=doc_type,doc_form = doc_form)
   }
   pdf_doc_dirs = repbox_doc_dirs(project_dir, doc_form="pdf", doc_type=doc_type)
   if (isTRUE(steps$tab_notes_pdf)) {

@@ -38,6 +38,7 @@ script_df_shorten_file = function(script_df) {
 }
 
 rai_load_do_source = function(project_dir, parcels=list()) {
+  restore.point("rai_load_do_source")
   parcels = repdb_load_parcels(project_dir, "stata_source",parcels)
   script_df = parcels$stata_source$script_source
   script_df = script_df_shorten_file((script_df))

@@ -92,6 +92,8 @@ If the regression command was called multiple times inside a loop, multiple outp
       #txt = htmltools::htmlEscape(txt)
     )
   
+  
+  
   ldf = left_join(ldf,
     select(cmd_df, orgline_start, orgline_end, line, is_reg, cmd, script_num),
     join_by(script_num, between(orgline,orgline_start,orgline_end))

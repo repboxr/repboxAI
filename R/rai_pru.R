@@ -198,6 +198,7 @@ rai_pru_load_parcels = function(pru, parcel_names, parcels=pru[["parcels"]]) {
 
 rai_pru_add_static_do = function(pru, in_context=FALSE) {
   restore.point("rai_pru_add_static_do")
+  project_dir = pru$project_dir
   pru = rai_pru_load_parcels(pru, "stata_source")
   pru$do_df = rai_load_do_source(project_dir,pru$parcels) 
   outfile = rai_media_all_static_do(project_dir,script_df = pru$do_df)
@@ -215,6 +216,7 @@ rai_pru_add_reg_df = function(pru, parcels = pru$parcels) {
 rai_pru_add_run_do = function(pru, in_context=FALSE, only_reg_df_output = FALSE) {
   restore.point("rai_pru_add_run_do")
   pru = rai_pru_load_parcels(pru, "stata_source")
+  project_dir = pru$project_dir
   pru$do_df = rai_load_do_source(project_dir,pru$parcels)
   output_just_runid = NULL
   if (only_reg_df_output) {
@@ -422,3 +424,6 @@ proc_rai_pru_run = function(pru) {
     rstudioapi::filesPaneNavigate(pru$ver_dir)
   return(invisible(pru))
 }
+
+
+

@@ -353,24 +353,33 @@ repbox_outage_ver_dirs = function(project_dirs, steps = repbox_fp_steps_from(TRU
   ver_dirs
 }  
 
-repbox_rerun_outages = function(project_dirs, steps = repbox_fp_steps_from(TRUE), max_repeat=0, sleep_sec = 30) {
+repbox_rerun_outages = function(project_dirs, steps = repbox_fp_steps_from(TRUE), max_repeat=0,gap=10, gap_if_limited=60, max_limited=2, sleep_sec = gap, shuffle=TRUE, ver_dirs = NULL) {
   restore.point("repbox_rerun_outages")
   steps = repbox_fp_join_steps(steps)
-  ver_dirs = repbox_outage_ver_dirs(project_dirs, steps)
-  cat(paste0("\n", length(ver_dirs), " outages found.\n\n"))
-  if (length(ver_dirs)==0) return(NULL)
+  if (is.null(ver_dirs)) {
+    ver_dirs = repbox_outage_ver_dirs(project_dirs, steps)
+    cat(paste0("\n", length(ver_dirs), " outages found in ", length(project_dirs), " projects\n\n"))
+  }
+  if (length(ver_dirs)==0) return(list(num_outages=0, num_remain=0, ver_dirs=ver_dirs, remain_ver_dirs=ver_dirs))
+  
+  if (shuffle) ver_dirs = sample(ver_dirs)
   
   rem_ver_dirs = ver_dirs
   counter = 0
   while(counter <= max_repeat) {
     counter = counter+1
-    fp_rerun_all_outage_ver(ver_dirs=rem_ver_dirs)
+    res = list(stop=FALSE)
+    for (ver_dir in rem_ver_dirs) {
+      fp_rerun_outage_ver(ver_dir=ver_dir)
+      res = pru_rate_limit_sleep(gap=gap, gap_if_limited=gap_if_limited, max_limited=max_limited)
+    }
     rem_ver_dirs = repbox_outage_ver_dirs(project_dirs, steps)
+    if (isTRUE(res$stop)) break
+
     if (length(rem_ver_dirs)==0 | counter > max_repeat) break
-    cat(paste0("\n\n", length(rem_ver_dirs), " remaining outages.\nSleep for ", sleep_sec, " sec...\n"))
-    Sys.sleep(sleep_sec)
   }
-  invisible(ver_dirs)
+  return(list(num_outages=length(ver_dirs), num_remain=length(rem_ver_dirs), ver_dirs=ver_dirs, remain_ver_dirs=rem_ver_dirs))
+  
 }
 
 repbox_rerun_errors = function(project_dirs, steps = repbox_fp_steps_from(TRUE)) {

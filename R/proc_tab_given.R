@@ -4,7 +4,6 @@
 example = function() {
   library(repboxAI)
   rgemini::set_gemini_api_key(file = "~/repbox/gemini/gemini_api_key.txt")
-  project_dir = "~/repbox/projects_share/aejapp_1_2_4"
   project_dir = "~/repbox/projects_share/aejapp_1_2_7"
   project_dir = "~/repbox/projects_share/ecta_84_2_6"
   project_dir = "~/repbox/projects_share/jeea_12_1_11"
@@ -18,29 +17,33 @@ example = function() {
   project_dir = "~/repbox/projects_share/aeri_1_2_6"
   
   project_dir = "~/repbox/projects_share/restud_82_2_12" 
+  
+  project_dir = "~/repbox/projects_share/aejapp_1_2_4"
+  proc_tab_given(project_dir, overwrite_doc=FALSE)
+  
   proc_tab_given(project_dir)
   rstudioapi::filesPaneNavigate(project_dir)
 }
 
-proc_tab_given = function(project_dir, to_v0=TRUE, doc_form=NULL, doc_type=NULL, patch_forms = "mocr") {
+proc_tab_given = function(project_dir, to_v0=TRUE, doc_form=NULL, doc_type=NULL, patch_forms = "mocr", overwrite_doc = TRUE) {
   restore.point("proc_tab_given")
   all_doc_dirs = repboxDoc::repbox_doc_dirs(project_dir, doc_type=doc_type)
   doc_dirs = repboxDoc::repbox_doc_dirs(project_dir,doc_form = doc_form, doc_type=doc_type)
   doc_dir = first(doc_dirs)
   for (doc_dir in doc_dirs) {
     patch_doc_dir = find_patch_doc_dir(doc_dir, doc_dirs=all_doc_dirs, patch_forms=patch_forms)
-    proc_doc_tab_given(doc_dir,patch_doc_dir=patch_doc_dir, to_v0=to_v0)
+    proc_doc_tab_given(doc_dir,patch_doc_dir=patch_doc_dir, to_v0=to_v0, overwrite_doc = overwrite_doc)
   }
 }
 
-proc_doc_tab_given = function(doc_dir, patch_doc_dir=NULL, to_v0=TRUE) {
+proc_doc_tab_given = function(doc_dir, patch_doc_dir=NULL, to_v0=TRUE, overwrite_doc = TRUE) {
   restore.point("proc_doc_tab_given")
   prod_id = "tab_main"; prod = repbox_prod(prod_id)
   doc_form = rdoc_form(doc_dir)
   
   # Creates page_df.Rds, parts_df.Rds, tabs_df.Rds etc
   # if already exists skips
-  rdoc_process(doc_dir,overwrite=TRUE)
+  rdoc_process(doc_dir,overwrite=overwrite_doc)
   
   rdoc_is_processed(doc_dir)
   
